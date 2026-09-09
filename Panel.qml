@@ -948,6 +948,19 @@ Panel {
           }
         }
 
+        // The map's legend, docked as a colour strip under the map: it names
+        // whichever ramp the map is drawing, in the same column and at the same
+        // width, so it reads as part of the map without covering any of it.
+        LegendStrip {
+          width: parent.width
+          bar: root.bar
+          mode: root.shownAirLayerName !== "" ? root.activeCategory : "radar"
+          schemeName: RadarModel.colorSchemeName(root.colorSchemeId)
+          layerLabel: root.activeLayer ? CamsModel.layerLabel(root.activeLayer) : ""
+          lowEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).low : ""
+          highEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).high : ""
+        }
+
         LayerPicker {
           width: parent.width
           bar: root.bar

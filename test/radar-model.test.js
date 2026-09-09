@@ -322,6 +322,49 @@ test("intensity labels follow the calibrated bands", () => {
   assert.strictEqual(RadarModel.intensityLabel(255), "severe")
 })
 
+// ------------------------------------------------------------------ legend
+
+test("the legend names the painted rungs of the intensity ladder", () => {
+  const bands = RadarModel.radarLegendBands()
+  // "Clear" paints nothing and "severe" is just the far end of heavy, so the
+  // legend carries the three rungs that have a colour of their own.
+  assert.deepStrictEqual(bands.map(b => b.name),
+    ["light", "moderate", "heavy"])
+  assert.deepStrictEqual(bands.map(b => b.value),
+    [RadarModel.INTENSITY_LIGHT, RadarModel.INTENSITY_MODERATE,
+     RadarModel.INTENSITY_HEAVY])
+})
+
+test("every legend rung sits on the ramp it names", () => {
+  // The ladder's low rung is 0; the strongest echo the tile can carry is 255.
+  // Each legend name lands between the two, in order — a legend whose labels
+  // are out of order would name the ramp wrongly.
+  for (const band of RadarModel.radarLegendBands()) {
+    const fraction = RadarModel.radarLegendFraction(band.value)
+    assert.ok(fraction >= 0 && fraction <= 1, band.name)
+  }
+  const fractions = RadarModel.radarLegendBands()
+    .map(b => RadarModel.radarLegendFraction(b.value))
+  assert.ok(fractions.every((f, i) => i === 0 || f > fractions[i - 1]),
+    "fainter bands sit left of stronger ones")
+
+  assert.strictEqual(RadarModel.radarLegendFraction(0), 0)
+  assert.strictEqual(RadarModel.radarLegendFraction(255), 1)
+  assert.strictEqual(RadarModel.radarLegendFraction(-5), 0)
+  assert.strictEqual(RadarModel.radarLegendFraction(null), 0)
+})
+
+test("the legend ramp is the palette the tile quantises to", () => {
+  // The scheme parameter is inert today (every documented id returns the same
+  // tile), so the legend paints the one real ramp the tiles carry. It must be
+  // entirely literal hex colours — never symbols, never a URL — because the
+  // legend is painted from it and Qt guesses at anything that is not a colour.
+  const stops = RadarModel.RADAR_GRADIENT_STOPS
+  assert.ok(stops.length >= 8, "a legend one cell wide would be unreadable")
+  for (const stop of stops) assert.match(stop, /^#[0-9a-f]{6}$/i, stop)
+  assert.strictEqual(new Set(stops).size, stops.length, "no repeated stop")
+})
+
 test("a transparent centre pixel means a ground radar reaches here", () => {
   const size = 16
   const clear = new Uint8ClampedArray(size * size * 4)

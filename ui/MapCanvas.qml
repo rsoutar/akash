@@ -282,6 +282,8 @@ Item {
     // The same affordance every map has, because the keyboard shortcut for
     // it is not discoverable and someone who has panned away has no other
     // way back short of retyping their city.
+    // Note: the colour legend is not here. It is docked under this map in the
+    // panel (Panel.qml) so it reads as part of the map without covering it.
     Button {
       anchors.left: parent.left
       anchors.bottom: parent.bottom

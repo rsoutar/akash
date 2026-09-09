@@ -239,6 +239,7 @@ failure:
 ```bash
 ./test/first-run.sh       # a machine that has never set a weather location
 ./test/basemap-steps.sh   # decoding the ground never stalls the shell
+./test/legend.qml-test.sh # the map legend compiles and renders its two ramps
 ```
 
 QML is also checked statically, which needs the shell's modules on the import

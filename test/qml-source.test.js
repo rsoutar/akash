@@ -76,6 +76,21 @@ test("radar rendering is disabled when an air category owns the map", () => {
   assert.match(tileLayer, /model: root\.active \? root\.tiles : \[\]/)
 })
 
+test("the legend is a strip docked under the map at the map's width", () => {
+  const panel = read("Panel.qml")
+  const legend = read(join("ui", "LegendStrip.qml"))
+
+  // The legend names whichever overlay is showing, sits under the map in the
+  // panel's own column, spans the map's width — and is not inside the bar pill,
+  // which keeps its own one-line reading.
+  assert.match(panel, /LegendStrip \{\s*\n\s*width: parent\.width/)
+  assert.match(panel, /mode: root\.shownAirLayerName !== "" \? root\.activeCategory : "radar"/)
+  assert.match(panel, /schemeName: RadarModel\.colorSchemeName\(root\.colorSchemeId\)/)
+  assert.match(panel, /layerLabel: root\.activeLayer \? CamsModel\.layerLabel/)
+  assert.match(legend, /textFormat\s*:\s*Text\.PlainText/)
+  assert.match(legend, /Color\.popups\.background/)
+})
+
 // Strings that leave this plugin for components it does not own. Notification
 // bodies are rendered by Omarchy's notification stack, which cannot be pinned
 // to PlainText and whose body field is markup-capable.

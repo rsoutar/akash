@@ -184,3 +184,31 @@ test("the level carries the name and colour the pill renders", () => {
   assert.strictEqual(level.name, "Poor")
   assert.strictEqual(level.color, CamsModel.BAND_COLORS[3])
 })
+
+// ------------------------------------------------------------------ legend
+
+test("the air legend is the EEA bands, low to high", () => {
+  const rows = CamsModel.airQualityLegend()
+  assert.deepStrictEqual(rows.map(r => r.name), CamsModel.BAND_NAMES)
+  assert.deepStrictEqual(rows.map(r => r.color), CamsModel.BAND_COLORS)
+  assert.deepStrictEqual(rows.map(r => r.index), [0, 1, 2, 3, 4, 5])
+})
+
+test("each category names the ends of its own ramp", () => {
+  assert.strictEqual(CamsModel.legendEnds("air-quality").low, "Cleaner")
+  assert.strictEqual(CamsModel.legendEnds("air-quality").high, "More polluted")
+  assert.strictEqual(CamsModel.legendEnds("allergens").low, "Less pollen")
+  assert.strictEqual(CamsModel.legendEnds("allergens").high, "More pollen")
+  assert.strictEqual(CamsModel.legendEnds("aerosols").low, "Clearer")
+  assert.strictEqual(CamsModel.legendEnds("aerosols").high, "Hazier")
+  assert.strictEqual(CamsModel.legendEnds("uv").low, "Low UV")
+  assert.strictEqual(CamsModel.legendEnds("uv").high, "Extreme UV")
+})
+
+test("an unnamed category still names its bands", () => {
+  // The advanced tail has no declared ends; the scale must not lose its names.
+  const ends = CamsModel.legendEnds("advanced")
+  assert.ok(ends.low !== "" && ends.high !== "")
+  const rows = CamsModel.airQualityLegend()
+  assert.deepStrictEqual(rows.map(r => r.name), CamsModel.BAND_NAMES)
+})
