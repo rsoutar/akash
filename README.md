@@ -16,10 +16,8 @@ No account, no API key.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/OWNER/aeroradar.git --enable
+omarchy plugin add https://github.com/rsoutar/aeroradar.git --enable
 ```
-
-*(Replace the URL with this repository's published address.)*
 
 The widget lands on the right of the bar: a radar scope with an air-quality
 pill beside it. Consider moving it next to the stock weather widget, which
@@ -115,9 +113,10 @@ The chips at the top of the panel switch between:
 
 Inside Europe the map uses CAMS's high-resolution regional forecast;
 everywhere else it falls back to the coarser global model, picked from your
-system timezone — no location picker involved. The overlay's opacity is a
-slider, and which layers are enabled per category is remembered, along with
-the last layer, view and time, across restarts.
+system timezone — no location picker involved. Layer selections per category
+survive across panel opens for the session, and the last-used chip is
+persisted in the widget's settings (the **Open panel on** setting reads it as
+"Last used").
 
 ### The bar pill
 
