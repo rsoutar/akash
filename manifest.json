@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "id": "aeroradar",
+  "name": "Aeroradar",
+  "version": "0.1.0",
+  "author": "aeroradar contributors",
+  "license": "MIT",
+  "description": "Live weather radar and Copernicus CAMS air quality on one map in the Omarchy bar, with storm and air-quality alerts. No account, no API key.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Aeroradar",
+    "description": "Weather radar plus CAMS air quality, pollen and UV on one map, with optional storm and air-quality alerts.",
+    "category": "Info",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "alertsEnabled": false,
+      "alertRadiusKm": 100,
+      "alertMinIntensity": "Heavy",
+      "aqAlertsEnabled": false,
+      "aqAlertBand": "Poor",
+      "colorScheme": "TITAN",
+      "defaultZoom": 7,
+      "smoothTiles": true,
+      "showSnow": true,
+      "showLabel": false,
+      "defaultView": "Radar"
+    },
+    "schema": [
+      {
+        "key": "defaultView",
+        "type": "enum",
+        "label": "Open panel on",
+        "options": [
+          "Radar",
+          "Air quality",
+          "Allergens",
+          "Aerosols",
+          "UV",
+          "Last used"
+        ],
+        "defaultValue": "Radar",
+        "description": "Which view the panel shows each time it opens — Radar by default, or your last-used chip. Allergens outside Europe falls back to Air quality."
+      },
+      {
+        "key": "alertsEnabled",
+        "type": "boolean",
+        "label": "Storm alerts",
+        "defaultValue": false,
+        "description": "Notify when rain or a storm is forecast to reach you from within the alert radius. Also toggleable from the panel."
+      },
+      {
+        "key": "aqAlertsEnabled",
+        "type": "boolean",
+        "label": "Air quality alerts",
+        "defaultValue": false,
+        "description": "Notify when the tracked air-quality layer reaches the chosen band at your location, now or in the next few forecast hours. Also toggleable from the panel."
+      },
+      {
+        "key": "aqAlertBand",
+        "type": "enum",
+        "label": "Air quality threshold",
+        "options": [
+          "Moderate",
+          "Poor",
+          "Very poor",
+          "Extremely poor"
+        ],
+        "defaultValue": "Poor",
+        "description": "Minimum EEA air-quality band worth a notification, on the tracked layer (default PM2.5). Cut-offs are per species, so the band means the right concentration whatever the layer."
+      },
+      {
+        "key": "alertRadiusKm",
+        "type": "integer",
+        "label": "Alert radius (km)",
+        "min": 25,
+        "max": 250,
+        "step": 25,
+        "defaultValue": 100,
+        "description": "How far out to watch, and with it how far ahead to look: storms travel 40-60 km/h, so 100 km is roughly two hours of warning. The panel offers the common values; any step of 25 works here."
+      },
+      {
+        "key": "alertMinIntensity",
+        "type": "enum",
+        "label": "Alert threshold",
+        "options": [
+          "Light",
+          "Moderate",
+          "Heavy",
+          "Severe"
+        ],
+        "defaultValue": "Heavy",
+        "description": "Minimum forecast rain rate worth a notification. Moderate or heavier arriving into an unstable airmass counts one band up, so a storm crosses the threshold sooner than steady rain of the same rate."
+      },
+      {
+        "key": "colorScheme",
+        "type": "enum",
+        "label": "Colour scheme",
+        "options": [
+          "TITAN",
+          "Meteored",
+          "NEXRAD Level III",
+          "Rainbow",
+          "The Weather Channel",
+          "Universal Blue",
+          "Dark Sky",
+          "Greyscale"
+        ],
+        "defaultValue": "TITAN",
+        "description": "Radar palette. NEXRAD Level III matches what most broadcast meteorologists show."
+      },
+      {
+        "key": "defaultZoom",
+        "type": "integer",
+        "label": "Default zoom",
+        "min": 3,
+        "max": 9,
+        "step": 1,
+        "defaultValue": 7,
+        "description": "Zoom the map opens at. Past level 7 the ground keeps sharpening while the radar is scaled up, since that is where the radar data runs out."
+      },
+      {
+        "key": "smoothTiles",
+        "type": "boolean",
+        "label": "Smooth radar",
+        "defaultValue": true,
+        "description": "Blend the radar image instead of showing hard pixel edges."
+      },
+      {
+        "key": "showSnow",
+        "type": "boolean",
+        "label": "Distinguish snow",
+        "defaultValue": true,
+        "description": "Colour snow separately from rain."
+      },
+      {
+        "key": "showLabel",
+        "type": "boolean",
+        "label": "Show status text in bar",
+        "defaultValue": false,
+        "description": "Print the outlook next to the bar icon: what is approaching, and when. Requires storm alerts to be on, since what it prints is their forecast."
+      }
+    ]
+  }
+}
