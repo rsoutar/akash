@@ -93,6 +93,17 @@ Item {
   property string airStepTime: ""
   property real airOpacity: 0.6
 
+  // The legend chip: which overlay is showing, named so the map explains
+  // itself. `legendMode` is "radar" while the radar owns the map, else the
+  // CAMS category the air overlay is drawn from. `radarOverlayVisible` is the
+  // switch: the legend is the radar ramp whenever the radar owns the map, and
+  // the CAMS bands whenever an air overlay is on.
+  property string legendMode: "radar"
+  property string legendSchemeName: ""
+  property string legendLayerLabel: ""
+  property string legendLowEnd: ""
+  property string legendHighEnd: ""
+
   signal dragged(real latitude, real longitude)
   signal recenterRequested()
 
@@ -276,6 +287,26 @@ Item {
 
         root.zoomRequested(next, moved.latitude, moved.longitude)
       }
+    }
+
+// The legend: the ramp the map is drawing right now, named in the rain's
+    // own words. The radar ramp while the radar owns the map, the CAMS bands
+    // while an air overlay is up — whichever overlay the map actually shows.
+    // The radar's own top rung is "severe" (the bands' last name) and its
+    // bottom one is the empty ramp, so the ends are the scheme's own words;
+    // the air scale gets the category's ends — "Cleaner → More polluted".
+    LegendStrip {
+      id: legend
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      anchors.margins: Style.space(6)
+      width: Math.min(Style.space(304), Math.max(Style.space(224), parent.width - Style.space(128)))
+      bar: root.bar
+      mode: root.airOverlayVisible ? root.legendMode : "radar"
+      schemeName: root.legendSchemeName
+      layerLabel: root.legendLayerLabel
+      lowEnd: root.airOverlayVisible ? root.legendLowEnd : ""
+      highEnd: root.airOverlayVisible ? root.legendHighEnd : ""
     }
 
     // ---- Overlays -------------------------------------------------------

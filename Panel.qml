@@ -902,6 +902,12 @@ Panel {
           airLayerName: root.shownAirLayerName
           airStepTime: root.shownAirStepTime
 
+          legendMode: root.radarMode ? "radar" : root.activeCategory
+          legendSchemeName: RadarModel.colorSchemeName(root.colorSchemeId)
+          legendLayerLabel: root.activeLayer ? CamsModel.layerLabel(root.activeLayer) : ""
+          legendLowEnd: root.radarMode ? "Trace" : CamsModel.legendEnds(root.activeCategory).low
+          legendHighEnd: root.radarMode ? "Severe" : CamsModel.legendEnds(root.activeCategory).high
+
           onDragged: function(latitude, longitude) {
             root.viewLatitude = TileMath.constrainLatitude(latitude, root.zoom, root.mapHeight)
             // Normalised as it is stored, so panning east indefinitely keeps

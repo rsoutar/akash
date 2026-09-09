@@ -76,6 +76,26 @@ test("radar rendering is disabled when an air category owns the map", () => {
   assert.match(tileLayer, /model: root\.active \? root\.tiles : \[\]/)
 })
 
+test("the legend sits on the map and names whichever overlay is showing", () => {
+  const canvas = read(join("ui", "MapCanvas.qml"))
+  const legend = read(join("ui", "LegendStrip.qml"))
+  const panel = read("Panel.qml")
+
+  // The legend is map chrome, mounted in the canvas next to the attribution —
+  // not in the bar pill, which keeps its own one-line reading.
+  assert.match(canvas, /LegendStrip \{\s*\n\s*id: legend/)
+  assert.match(legend, /textFormat\s*:\s*Text\.PlainText/)
+  assert.match(legend, /Color\.popups\.background/)
+
+  // The radar legend names the palette the tile was requested in, the air
+  // legend the layer the overlay draws; both come from the panel's selection,
+  // never from a palette hardcoded here.
+  assert.match(canvas, /schemeName: root\.legendSchemeName/)
+  assert.match(canvas, /layerLabel: root\.legendLayerLabel/)
+  assert.match(panel, /legendSchemeName: RadarModel\.colorSchemeName\(root\.colorSchemeId\)/)
+  assert.match(panel, /legendLayerLabel: root\.activeLayer \? CamsModel\.layerLabel/)
+})
+
 // Strings that leave this plugin for components it does not own. Notification
 // bodies are rendered by Omarchy's notification stack, which cannot be pinned
 // to PlainText and whose body field is markup-capable.
