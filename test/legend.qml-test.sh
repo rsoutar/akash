@@ -14,9 +14,10 @@
 # the same module layout the running shell provides the widget.
 #
 # Offline by construction, like the other shell tests: nothing here reads the
-# network, and the probe instantiates the legend standalone rather than wiring
-# a whole panel. Needs `qs` and the Omarchy shell modules; skips without them,
-# and AERORADAR_REQUIRE_QS turns the skip into a failure (what CI sets).
+# network, and the probe instantiates the legend and the map standalone rather
+# than wiring a whole panel. Needs `qs` and the Omarchy shell modules; skips
+# without them, and AERORADAR_REQUIRE_QS turns the skip into a failure (what
+# CI sets).
 
 set -uo pipefail
 
@@ -111,7 +112,7 @@ if [[ $(value map-loaded) != "yes" ]]; then
   exit 1
 fi
 
-check "MapCanvas.qml loads with the legend mounted"                 "yes" "$(value map-loaded)"
+check "MapCanvas.qml still loads without the legend inside it"      "yes" "$(value map-loaded)"
 check "the radar legend names the painted rungs"      "light,moderate,heavy" "$(value radar-tiers)"
 check "the radar legend names the palette"           "Radar · TITAN | " "$(value radar-title)"
 check "the air legend names the EEA bands"            "Good,Fair,Moderate,Poor,Very poor,Extremely poor" "$(value air-tiers)"

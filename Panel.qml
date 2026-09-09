@@ -902,12 +902,6 @@ Panel {
           airLayerName: root.shownAirLayerName
           airStepTime: root.shownAirStepTime
 
-          legendMode: root.radarMode ? "radar" : root.activeCategory
-          legendSchemeName: RadarModel.colorSchemeName(root.colorSchemeId)
-          legendLayerLabel: root.activeLayer ? CamsModel.layerLabel(root.activeLayer) : ""
-          legendLowEnd: root.radarMode ? "Trace" : CamsModel.legendEnds(root.activeCategory).low
-          legendHighEnd: root.radarMode ? "Severe" : CamsModel.legendEnds(root.activeCategory).high
-
           onDragged: function(latitude, longitude) {
             root.viewLatitude = TileMath.constrainLatitude(latitude, root.zoom, root.mapHeight)
             // Normalised as it is stored, so panning east indefinitely keeps
@@ -952,6 +946,19 @@ Panel {
               if (!covered) console.log("aeroradar: no ground radar reaches the configured location")
             }
           }
+        }
+
+        // The map's legend, docked as a colour strip under the map: it names
+        // whichever ramp the map is drawing, in the same column and at the same
+        // width, so it reads as part of the map without covering any of it.
+        LegendStrip {
+          width: parent.width
+          bar: root.bar
+          mode: root.shownAirLayerName !== "" ? root.activeCategory : "radar"
+          schemeName: RadarModel.colorSchemeName(root.colorSchemeId)
+          layerLabel: root.activeLayer ? CamsModel.layerLabel(root.activeLayer) : ""
+          lowEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).low : ""
+          highEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).high : ""
         }
 
         LayerPicker {

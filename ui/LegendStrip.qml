@@ -7,16 +7,17 @@ import "../lib/CamsModel.js" as CamsModel
 // What the map's colours mean.
 //
 // The map draws two kinds of tile: a radar frame from RainViewer and a CAMS
-// air-quality overlay. Neither carries its own legend, so this chip sits on the
-// map and names the ramp both draw with. It appears only over the map — the bar
-// pill keeps its own, briefer language — and it explains whichever overlay is
-// actually showing.
+// air-quality overlay. Neither carries its own legend, so this strip sits
+// docked under the map in the panel and names the ramp the map is drawing. It
+// lives below the map, at the map's width, so it reads as part of the map
+// without covering the corner of it — and it stays out of the bar pill, which
+// keeps its own, briefer language.
 //
 // Colours here are data, not chrome: the radar bar is painted from the palette
 // the tile actually renders (`RadarModel.radarGradientStops`), and the air bar
 // from the EEA bands (`CamsModel.BAND_COLORS`), so the legend stays faithful to
 // the picture the way DESIGN.md's Picture section demands. Every label is
-// drawn in the theme's ink so the chip reads on a light Omarchy theme and a
+// drawn in the theme's ink so the strip reads on a light Omarchy theme and a
 // dark one. The ends — "Cleaner → More polluted", "Less pollen → More pollen",
 // "Trace" to "Severe" — are passed in by the panel, which owns which category
 // the map is showing.

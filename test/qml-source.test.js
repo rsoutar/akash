@@ -76,24 +76,19 @@ test("radar rendering is disabled when an air category owns the map", () => {
   assert.match(tileLayer, /model: root\.active \? root\.tiles : \[\]/)
 })
 
-test("the legend sits on the map and names whichever overlay is showing", () => {
-  const canvas = read(join("ui", "MapCanvas.qml"))
-  const legend = read(join("ui", "LegendStrip.qml"))
+test("the legend is a strip docked under the map at the map's width", () => {
   const panel = read("Panel.qml")
+  const legend = read(join("ui", "LegendStrip.qml"))
 
-  // The legend is map chrome, mounted in the canvas next to the attribution —
-  // not in the bar pill, which keeps its own one-line reading.
-  assert.match(canvas, /LegendStrip \{\s*\n\s*id: legend/)
+  // The legend names whichever overlay is showing, sits under the map in the
+  // panel's own column, spans the map's width — and is not inside the bar pill,
+  // which keeps its own one-line reading.
+  assert.match(panel, /LegendStrip \{\s*\n\s*width: parent\.width/)
+  assert.match(panel, /mode: root\.shownAirLayerName !== "" \? root\.activeCategory : "radar"/)
+  assert.match(panel, /schemeName: RadarModel\.colorSchemeName\(root\.colorSchemeId\)/)
+  assert.match(panel, /layerLabel: root\.activeLayer \? CamsModel\.layerLabel/)
   assert.match(legend, /textFormat\s*:\s*Text\.PlainText/)
   assert.match(legend, /Color\.popups\.background/)
-
-  // The radar legend names the palette the tile was requested in, the air
-  // legend the layer the overlay draws; both come from the panel's selection,
-  // never from a palette hardcoded here.
-  assert.match(canvas, /schemeName: root\.legendSchemeName/)
-  assert.match(canvas, /layerLabel: root\.legendLayerLabel/)
-  assert.match(panel, /legendSchemeName: RadarModel\.colorSchemeName\(root\.colorSchemeId\)/)
-  assert.match(panel, /legendLayerLabel: root\.activeLayer \? CamsModel\.layerLabel/)
 })
 
 // Strings that leave this plugin for components it does not own. Notification
