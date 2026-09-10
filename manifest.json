@@ -31,7 +31,8 @@
       "smoothTiles": true,
       "showSnow": true,
       "showLabel": false,
-      "defaultView": "Radar"
+      "defaultView": "Radar",
+      "locationPrompted": false
     },
     "schema": [
       {
@@ -146,6 +147,13 @@
         "label": "Show status text in bar",
         "defaultValue": false,
         "description": "Print the outlook next to the bar icon: what is approaching, and when. Requires storm alerts to be on, since what it prints is their forecast."
+      },
+      {
+        "key": "locationPrompted",
+        "type": "boolean",
+        "label": "First-run location prompt shown",
+        "defaultValue": false,
+        "description": "Akash asks for a city the first time the panel is opened without a location. After that this stays set, whether you answered or skipped — a fresh install is asked exactly once."
       }
     ]
   }

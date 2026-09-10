@@ -39,6 +39,10 @@ Column {
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
 
+  // Whether the search field currently owns the keyboard, so a parent can
+  // hang its key-catcher temporarily.
+  readonly property bool fieldFocused: locationField.activeFocus
+
   function focusQuery() {
     locationField.forceActiveFocus()
   }
@@ -47,13 +51,17 @@ Column {
     width: parent.width
     height: Style.spacing.controlHeight
 
-    // Resting state: the city name, click to change it.
+    // Resting state: the current city, the pencil to change it, and any
+    // warnings. The name leads so the row says what the location is; the
+    // pencil is the affordance; the warnings are the facts.
     Row {
       visible: !root.editing
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(8)
 
+      // The city in the body size, dimmed when nothing is configured so the
+      // empty state reads as a prompt rather than as an answer.
       Text {
         textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
@@ -74,7 +82,7 @@ Column {
         opacity: 0.45
       }
 
-      // Both sit beside the city rather than over the map: they are facts
+      // Both warnings sit here rather than over the map: they are facts
       // about the configured location, not about whatever the view happens
       // to be showing.
       //
@@ -87,7 +95,7 @@ Column {
         textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         visible: root.locationState === "unresolved"
-        text: "· no coordinates — pick one from the list"
+        text: "no coordinates — pick one from the list"
         color: Color.urgent
         font.family: Style.font.family
         font.pixelSize: Style.font.caption
@@ -98,7 +106,7 @@ Column {
         textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         visible: root.coverageMissing
-        text: "· no radar coverage"
+        text: "no radar coverage"
         color: Color.urgent
         font.family: Style.font.family
         font.pixelSize: Style.font.caption
