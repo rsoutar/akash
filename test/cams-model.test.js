@@ -194,6 +194,14 @@ test("the air legend is the EEA bands, low to high", () => {
   assert.deepStrictEqual(rows.map(r => r.index), [0, 1, 2, 3, 4, 5])
 })
 
+test("the air legend names its text as three paired levels", () => {
+  // The bar keeps six EEA colours; the words pair them into thirds so each
+  // label sits in the middle of its third, the way the radar legend's do.
+  const tiers = CamsModel.legendTiers()
+  assert.deepStrictEqual(tiers.map(t => t.name), ["Good", "Moderate", "Poor"])
+  assert.strictEqual(tiers.length, 3)
+})
+
 test("each category names the ends of its own ramp", () => {
   assert.strictEqual(CamsModel.legendEnds("air-quality").low, "Cleaner")
   assert.strictEqual(CamsModel.legendEnds("air-quality").high, "More polluted")
@@ -211,4 +219,6 @@ test("an unnamed category still names its bands", () => {
   assert.ok(ends.low !== "" && ends.high !== "")
   const rows = CamsModel.airQualityLegend()
   assert.deepStrictEqual(rows.map(r => r.name), CamsModel.BAND_NAMES)
+  assert.deepStrictEqual(CamsModel.legendTiers().map(t => t.name),
+    ["Good", "Moderate", "Poor"])
 })

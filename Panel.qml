@@ -282,10 +282,16 @@ Panel {
     swapWatchdog.stop()
   }
 
-  onActiveCategoryChanged: {
+  // A chip change must be acted on after `radarMode` and `activeLayer` — both
+  // bindings over `activeCategory` — have settled. QML runs this handler while
+  // those still hold the previous chip, so reading them here would take the
+  // wrong branch on the way back to Radar: it would clear the radar frames
+  // instead of staging one, and leave the air overlay up. Deferring to the end
+  // of the turn reads the settled values and restages the radar frame.
+  onActiveCategoryChanged: Qt.callLater(function() {
     syncAirOverlay()
     syncRadarOverlay()
-  }
+  })
 
   // ---------------------------------------------------------------------------
   // CAMS forecast steps
@@ -955,7 +961,6 @@ Panel {
           width: parent.width
           bar: root.bar
           mode: root.shownAirLayerName !== "" ? root.activeCategory : "radar"
-          schemeName: RadarModel.colorSchemeName(root.colorSchemeId)
           layerLabel: root.activeLayer ? CamsModel.layerLabel(root.activeLayer) : ""
           lowEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).low : ""
           highEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).high : ""

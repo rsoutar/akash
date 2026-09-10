@@ -74,7 +74,6 @@ ShellRoot {
     id: ls
     width: 304
     mode: "radar"
-    schemeName: "TITAN"
     Component.onCompleted: {
       harness.report("radar-tiers", ls.tiers.map(function(t) { return t.name }).join(","))
       harness.report("radar-title", ls.title + " | " + ls.endTitle)
@@ -113,9 +112,9 @@ if [[ $(value map-loaded) != "yes" ]]; then
 fi
 
 check "MapCanvas.qml still loads without the legend inside it"      "yes" "$(value map-loaded)"
-check "the radar legend names the painted rungs"      "light,moderate,heavy" "$(value radar-tiers)"
-check "the radar legend names the palette"           "Radar · TITAN | " "$(value radar-title)"
-check "the air legend names the EEA bands"            "Good,Fair,Moderate,Poor,Very poor,Extremely poor" "$(value air-tiers)"
+check "the radar legend names the colour families"      "Light,Moderate,Heavy" "$(value radar-tiers)"
+check "the radar legend names the palette"           "Radar | " "$(value radar-title)"
+check "the air legend names the three levels"          "Good,Moderate,Poor" "$(value air-tiers)"
 check "the air legend names layer and ends"           "Air quality · PM2.5 | Cleaner → More polluted" "$(value air-title)"
 
 echo
