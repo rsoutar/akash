@@ -1,7 +1,6 @@
 # Akash (อากาศ) for Omarchy
 
-**Akash** (อากาศ) is Thai for "sky", from the Sanskrit *ākāśa* — sky, space, or
-ether.
+**Akash** takes its name from Sanskrit ākāśa (sky, space, ether). In Thai, อากาศ is the air itself.
 
 Live weather radar and air quality on one map, in the [Omarchy](https://omarchy.org)
 bar. Click the bar icon for a map centred on your location — scrub through the
