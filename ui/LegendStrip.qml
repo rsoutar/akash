@@ -128,11 +128,21 @@ Item {
 
       if (root.mode === "radar") {
         var stops = RadarModel.RADAR_GRADIENT_STOPS
+        var values = RadarModel.RADAR_STOP_VALUES
         if (stops.length === 0) return
-        var each = Math.max(1, Math.floor(width / stops.length))
+        // Each cell spans its own share of the 0-255 scale the bins sit on,
+        // bounded by the midpoints of its neighbours, so a label anchored at
+        // value/255 lands on the colour of the bin that value belongs to.
+        // The first cell reaches back to the strip's edge and the last runs
+        // to the right end, so the ramp fills the bar it lives in.
         for (var i = 0; i < stops.length; i++) {
+          var start = i === 0 ? 0 : (values[i - 1] + values[i]) / 2
+          var end = i === stops.length - 1 ? 255 : (values[i] + values[i + 1]) / 2
+          var left = Math.round(start / 255 * width)
+          var right = Math.round(end / 255 * width)
+          if (right <= left) continue
           ctx.fillStyle = stops[i]
-          ctx.fillRect(i * each, 0, i === stops.length - 1 ? width - i * each : each, height)
+          ctx.fillRect(left, 0, right - left, height)
         }
       } else {
         var rows = root.airRows

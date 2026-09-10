@@ -365,6 +365,51 @@ test("the legend ramp is the palette the tile quantises to", () => {
   assert.strictEqual(new Set(stops).size, stops.length, "no repeated stop")
 })
 
+test("the legend ramp reads faint on the left, strongest on the right", () => {
+  // Measured off the live tiles (2026-09-10, z7, schemes byte-identical): the
+  // faintest bin the tile paints is the translucent dark tan, and the
+  // strongest is the darkest red in a storm core. An earlier table had that
+  // dark red first, which put the heaviest rain at the faint end of the
+  // legend — this test pins both ends so the mistake cannot return.
+  const stops = RadarModel.RADAR_GRADIENT_STOPS
+  assert.strictEqual(stops[0], "#636159", "the faintest tan leads the ramp")
+  assert.strictEqual(stops[stops.length - 1], "#5d0000",
+    "the darkest red closes the ramp")
+
+  // Every stop carries its place on the 0-255 scale, strictly climbing so a
+  // cell painted across its own share of the bar never doubles back.
+  const values = RadarModel.RADAR_STOP_VALUES
+  assert.strictEqual(values.length, stops.length,
+    "one value per colour, in the same order")
+  assert.ok(values.every((v, i) => i === 0 || v > values[i - 1]),
+    "bin values climb with the ramp")
+  assert.ok(values.every(v => Number.isInteger(v) && v >= 0 && v <= 255),
+    "bin values sit on the 0-255 scale")
+  assert.strictEqual(values[0], 20, "the faintest tan sits at the tile's lowest alpha")
+  assert.strictEqual(values[values.length - 1], 255)
+})
+
+test("legend rungs land on the tan bins they name", () => {
+  // The tan bins' values are the alphas the tiles carry, so each rung value
+  // calibrated at 60/120/170 must land inside the cell of a tan bin — never
+  // on the opaque bins whose values are only estimates — and the moderate
+  // and heavy rungs sit on the tan measured at exactly their alpha.
+  const stops = RadarModel.RADAR_GRADIENT_STOPS
+  const values = RadarModel.RADAR_STOP_VALUES
+  const tanCount = 25
+  for (const band of RadarModel.radarLegendBands()) {
+    const value = band.value
+    let cell = 0
+    while (cell < values.length - 1 && (values[cell] + values[cell + 1]) / 2 < value) cell++
+    assert.ok(cell < tanCount,
+      `${band.name} (${value}) lands on a measured tan bin, not an estimate`)
+  }
+  assert.strictEqual(stops[values.indexOf(RadarModel.INTENSITY_MODERATE)], "#aa9e79",
+    "moderate lands on the alpha-120 tan")
+  assert.strictEqual(stops[values.indexOf(RadarModel.INTENSITY_HEAVY)], "#d6c88f",
+    "heavy lands on the alpha-170 tan")
+})
+
 test("a transparent centre pixel means a ground radar reaches here", () => {
   const size = 16
   const clear = new Uint8ClampedArray(size * size * 4)
