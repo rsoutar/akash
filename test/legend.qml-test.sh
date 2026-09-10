@@ -16,7 +16,7 @@
 # Offline by construction, like the other shell tests: nothing here reads the
 # network, and the probe instantiates the legend and the map standalone rather
 # than wiring a whole panel. Needs `qs` and the Omarchy shell modules; skips
-# without them, and AERORADAR_REQUIRE_QS turns the skip into a failure (what
+# without them, and AKASH_REQUIRE_QS turns the skip into a failure (what
 # CI sets).
 
 set -uo pipefail
@@ -25,17 +25,17 @@ cd "$(dirname "$0")/.."
 plugin=$PWD
 
 if ! command -v qs > /dev/null 2>&1; then
-  if [[ -n ${AERORADAR_REQUIRE_QS:-} ]]; then
-    echo "AERORADAR_REQUIRE_QS is set and there is no qs on PATH" >&2
+  if [[ -n ${AKASH_REQUIRE_QS:-} ]]; then
+    echo "AKASH_REQUIRE_QS is set and there is no qs on PATH" >&2
     exit 1
   fi
-  echo "no qs on PATH; skipping (set AERORADAR_REQUIRE_QS to make this fatal)"
+  echo "no qs on PATH; skipping (set AKASH_REQUIRE_QS to make this fatal)"
   exit 0
 fi
 
 if [[ ! -d /usr/share/omarchy/shell/Commons || ! -d /usr/share/omarchy/shell/Ui ]]; then
-  if [[ -n ${AERORADAR_REQUIRE_QS:-} ]]; then
-    echo "AERORADAR_REQUIRE_QS is set and the Omarchy shell modules are missing" >&2
+  if [[ -n ${AKASH_REQUIRE_QS:-} ]]; then
+    echo "AKASH_REQUIRE_QS is set and the Omarchy shell modules are missing" >&2
     exit 1
   fi
   echo "Omarchy shell modules not found; skipping"

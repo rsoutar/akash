@@ -1,13 +1,13 @@
-# aeroradar — tasks
+# Akash — tasks
 
 Order matters: steps 1–2 give a working radar plugin (everything from omarchy-weather-radar), steps 3–6 add the air-quality half (kuki's side), steps 7–9 make it one coherent plugin. Each task ends in a verifiable state.
 
 ## 0. Scaffold
 
-- [x] **0.1** Create `manifest.json` (plugin id `aeroradar`, name, description, MIT licence) following the two upstream manifests.
+- [x] **0.1** Create `manifest.json` (plugin id `akash`, name, description, MIT licence) following the two upstream manifests.
 - [x] **0.2** Vendor from omarchy-weather-radar: `lib/TileMath.js`, `lib/Basemap.js`, `lib/Glyphs.js`, `lib/Frames.js`, `data/basemap.bin`, `tools/build-basemap.py`, and the `test/` harness (`load.js` + stream-ceiling + text-format tests).
 - [x] **0.3** Vendor `lib/RadarModel.js`, `lib/Alerts.js` (storm half), `lib/Settings.js` unchanged — they are pure functions and their tests come with them.
-- [x] **0.4** Set up symlink development flow: `ln -s ~/Projects/aeroradar ~/.config/omarchy/plugins/aeroradar`, `rescanPlugins`, `omarchy plugin validate .`.
+- [x] **0.4** Set up symlink development flow: `ln -s ~/Projects/akash ~/.config/omarchy/plugins/akash`, `rescanPlugins`, `omarchy plugin validate .`.
 - ✅ Verify: `node --test` passes on vendored libs untouched.
 
 ## 1. Radar-only plugin (vertical slice)
@@ -27,7 +27,7 @@ Order matters: steps 1–2 give a working radar plugin (everything from omarchy-
 
 ## 3. CAMS helper (port cams.py)
 
-- [x] **3.1** Adapt `cams.py` → aeroradar paths (`~/.config/omarchy/aeroradar/caps.json`, `state.json`, `AERORADAR_CONFIG_DIR` override); keep stdlib-only.
+- [x] **3.1** Adapt `cams.py` → akash paths (`~/.config/omarchy/akash/caps.json`, `state.json`, `AKASH_CONFIG_DIR` override); keep stdlib-only.
 - [x] **3.2** Keep: `init`/`capabilities` (6 h TTL cache), `probe` (GetFeatureInfo), `legend` (PNG decode), timezone-based region pick with the Europe bbox.
 - [x] **3.3** Harden: tolerate missing/renamed CAMS layers; capabilities parse never crashes the panel.
 - ✅ Verify: `python3 cams.py init` populates a cache; `probe --layer composition_europe_pm2p5_forecast_surface --lat .. --lon ..` returns a value+unit; legend decode returns hex colours.
@@ -66,7 +66,7 @@ Order matters: steps 1–2 give a working radar plugin (everything from omarchy-
 
 - [x] **8.1** README: install (`omarchy plugin add … --enable`), bar placement, usage, keyboard bindings, requirements (Omarchy Quattro, `python3`, `curl`), update note (`omarchy restart shell`), the "not a life-safety tool" disclaimer.
 - [x] **8.2** Attribution section: RainViewer, Open-Meteo, Copernicus CAMS/ECMWF, Natural Earth, plus code credit to kūki and omarchy-weather-radar (both MIT).
-- [x] **8.3** State contract: plugin writes only `~/.config/omarchy/aeroradar/` and its shell.json entry; document removal steps.
+- [x] **8.3** State contract: plugin writes only `~/.config/omarchy/akash/` and its shell.json entry; document removal steps.
 - ✅ Verify: clean install on a scratch `$HOME` follows the README end to end.
 
 ## 9. Polish

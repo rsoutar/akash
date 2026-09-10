@@ -5,7 +5,7 @@ import "lib/Glyphs.js" as Glyphs
 import "lib/Settings.js" as Settings
 import qs.Ui
 
-// Bar pill for aeroradar.
+// Bar pill for akash.
 //
 // Structure follows the first-party pattern: the widget owns the button and
 // lazily loads the panel, forwarding the open/close contract the bar's
@@ -13,9 +13,9 @@ import qs.Ui
 // two monitors show the same thing without either of them polling.
 BarWidget {
   id: root
-  moduleName: "aeroradar"
+  moduleName: "akash"
 
-  readonly property var service: bar && bar.shell ? bar.shell.serviceFor("aeroradar") : null
+  readonly property var service: bar && bar.shell ? bar.shell.serviceFor("akash") : null
 
   // Defined in Glyphs so the bar and the notification cannot drift.
   readonly property string icon: Glyphs.RADAR

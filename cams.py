@@ -4,8 +4,8 @@ JSON cache the shell can read, and persist the plugin's view state.
 
 Ported from kūki (https://github.com/cossssmin/kuki), MIT — with three changes:
 
-  1. Paths: state and cache live under ~/.config/omarchy/aeroradar/, overridable
-     with AERORADAR_CONFIG_DIR.
+  1. Paths: state and cache live under ~/.config/omarchy/akash/, overridable
+     with AKASH_CONFIG_DIR.
   2. The capabilities cache carries a format version. A cache written by an
      older layout is treated as stale and rebuilt, so a plugin update can
      change the shape of caps.json without every consumer having to defend
@@ -55,8 +55,8 @@ EUROPE_BBOX = {"lat_min": 30.0, "lat_max": 72.0, "lon_min": -25.0, "lon_max": 45
 
 
 def base_dir() -> Path:
-    override = os.environ.get("AERORADAR_CONFIG_DIR")
-    root = Path(override).expanduser() if override else Path.home() / ".config/omarchy/aeroradar"
+    override = os.environ.get("AKASH_CONFIG_DIR")
+    root = Path(override).expanduser() if override else Path.home() / ".config/omarchy/akash"
     return root
 
 
@@ -246,7 +246,7 @@ def fetch_bytes(url: str, timeout: int, max_bytes: int) -> bytes:
 
     A single `read(MAX + 1)` still buffers whatever the socket delivers per
     call, so the budget is checked per chunk before anything is assembled."""
-    request = urllib.request.Request(url, headers={"User-Agent": "aeroradar"})
+    request = urllib.request.Request(url, headers={"User-Agent": "akash"})
     chunks: list[bytes] = []
     total = 0
     with urllib.request.urlopen(request, timeout=timeout) as response:

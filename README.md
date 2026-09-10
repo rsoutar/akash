@@ -1,4 +1,7 @@
-# Aeroradar for Omarchy
+# Akash (อากาศ) for Omarchy
+
+**Akash** (อากาศ) is Thai for "sky", from the Sanskrit *ākāśa* — sky, space, or
+ether.
 
 Live weather radar and air quality on one map, in the [Omarchy](https://omarchy.org)
 bar. Click the bar icon for a map centred on your location — scrub through the
@@ -16,7 +19,7 @@ No account, no API key.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/rsoutar/aeroradar.git --enable
+omarchy plugin add https://github.com/rsoutar/akash.git --enable
 ```
 
 The widget lands on the right of the bar: a radar scope with an air-quality
@@ -24,7 +27,7 @@ pill beside it. Consider moving it next to the stock weather widget, which
 sits in the centre by default:
 
 ```bash
-omarchy plugin enable aeroradar --section center --after omarchy.weather
+omarchy plugin enable akash --section center --after omarchy.weather
 ```
 
 `--section` takes `left`, `center` or `right`, and `--before` works like
@@ -34,7 +37,7 @@ tuning the settings rather than after.
 ### Updating
 
 ```bash
-omarchy plugin update aeroradar
+omarchy plugin update akash
 omarchy restart shell
 ```
 
@@ -46,8 +49,8 @@ nothing else.
 ### Removing it
 
 ```bash
-omarchy plugin remove aeroradar
-rm -rf ~/.config/omarchy/aeroradar
+omarchy plugin remove akash
+rm -rf ~/.config/omarchy/akash
 ```
 
 The first command deletes the plugin and its entry in the bar. The second
@@ -173,7 +176,7 @@ notifications stay on screen until dismissed; lighter ones time out.
 
 The plugin writes only two places:
 
-- `~/.config/omarchy/aeroradar/` — `caps.json`, a cache of the CAMS layer
+- `~/.config/omarchy/akash/` — `caps.json`, a cache of the CAMS layer
   list refreshed at most every 6 hours, and `state.json`, your chosen layers
   and view.
 - Its entry in `~/.config/omarchy/shell.json` — bar placement and widget
@@ -198,9 +201,9 @@ Symlink a checkout into the plugin directory and the shell picks it up, so
 the source can live wherever you keep your projects:
 
 ```bash
-ln -s ~/Projects/aeroradar ~/.config/omarchy/plugins/aeroradar
+ln -s ~/Projects/akash ~/.config/omarchy/plugins/akash
 omarchy-shell shell rescanPlugins
-omarchy plugin enable aeroradar
+omarchy plugin enable akash
 omarchy plugin validate .
 ```
 
@@ -233,7 +236,7 @@ bodies are made inert first. `test/cams.test.py` pins the Python helper's
 byte ceilings and its tolerance of renamed CAMS layers.
 
 The rest run the QML itself, under Quickshell rather than in Node. They skip
-where there is no `qs`, and `AERORADAR_REQUIRE_QS=1` turns that skip into a
+where there is no `qs`, and `AKASH_REQUIRE_QS=1` turns that skip into a
 failure:
 
 ```bash
@@ -251,7 +254,7 @@ qmllint -I /usr/share/omarchy/shell -I . *.qml ui/*.qml
 
 ## Credits
 
-Aeroradar is two plugins folded into one, and would not exist without either:
+Akash is two plugins folded into one, and would not exist without either:
 
 - [kūki](https://github.com/cossssmin/kuki) by cossssmin — the air-quality
   half: the CAMS integration, the categories, the region logic and the

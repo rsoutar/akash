@@ -19,7 +19,7 @@
 # `omarchy-weather-location` are replaced on PATH, so the service's own
 # polling finds nothing to talk to — and the probe asks only for the basemap,
 # never for a manifest, so nothing else is started. Needs `qs`; skips without
-# it, and AERORADAR_REQUIRE_QS turns the skip into a failure, which is what
+# it, and AKASH_REQUIRE_QS turns the skip into a failure, which is what
 # CI sets.
 
 set -uo pipefail
@@ -28,11 +28,11 @@ cd "$(dirname "$0")/.."
 plugin=$PWD
 
 if ! command -v qs > /dev/null 2>&1; then
-  if [[ -n ${AERORADAR_REQUIRE_QS:-} ]]; then
-    echo "AERORADAR_REQUIRE_QS is set and there is no qs on PATH" >&2
+  if [[ -n ${AKASH_REQUIRE_QS:-} ]]; then
+    echo "AKASH_REQUIRE_QS is set and there is no qs on PATH" >&2
     exit 1
   fi
-  echo "no qs on PATH; skipping (set AERORADAR_REQUIRE_QS to make this fatal)"
+  echo "no qs on PATH; skipping (set AKASH_REQUIRE_QS to make this fatal)"
   exit 0
 fi
 
