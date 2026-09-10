@@ -36,13 +36,37 @@ The panel's top line (`ui/PanelHeader.qml`) carries the plugin's name and its
 live state: a terminal-style blinking dot, green and reading "Live" when idle,
 orange and reading "Fetching" while any request is in flight. The green and
 orange are fixed literals because the theme palette exposes no such roles; the
-name and label stay on the theme's foreground. This is the panel's only status
-readout — the map does not repeat it. "Fetching" tracks real requests — the
+name and label stay on the theme's foreground. The configured location sits
+dimmed right of the name (the LOCATION section's resting row shows only its
+warnings now) and clicking either starts the location search; a long saved
+name elides before it reaches the status cluster, so the header is always one
+line. This is the panel's only status readout — the map does not repeat it.
+"Fetching" tracks real requests — the
 service's polls, a location save, and the CAMS overlay's GetMap — not radar
 tile rendering: those tiles are cached by URL and merely re-decode when a chip
 returns to Radar, so counting them would blink the header on every switch.
 Work that finishes inside half a second is ignored too, so a fast request does
 not flash the label.
+
+Preferences the panel does not otherwise touch live in a dedicated settings
+page opened by the S key or its hint-cap at the foot of the panel, the way
+oma.quake's does: the page replaces the map column while it is open — a full
+swap rather than a section appended to the bottom of the scroll. Everything
+that is not the map lives there: the display settings (which view the panel
+opens on, the radar palette, the default zoom, the smooth-radar / snow /
+bar-label switches), the location picker, and the storm and air-quality alert
+controls; the main page is the header, the map, the legend, the layer picker
+and the timeline. The S hint-cap sits at the foot of both pages, reading
+"settings" / "close settings", and both it and its label are clickable. An
+open page edit owns the keyboard: typing "s" in a settings field edits, it
+does not close the page. Clicking the location in the header jumps to the
+settings page with the picker already editing.
+
+A fresh install with no location anywhere is asked for its city once: the
+first time the panel opens, a question box covers it asking "Where are you?",
+with the same geocoder and suggestion rows as the picker. Answering or
+skipping both set `locationPrompted`, so the question never reappears — the
+location is Omarchy's shared file afterwards, and the picker edits it there.
 
 Keep attribution: data credits (RainViewer, Open-Meteo, Copernicus
 CAMS/ECMWF, Natural Earth) in README's data-sources section, and code credits
@@ -62,7 +86,7 @@ The bar's air-quality probe falls back, when weather.json has no coordinates,
 to `state.json`'s `home` — a country-level value from the timezone, better
 than none — and then to no reading. A saved location name without coordinates
 is its own state, "unresolved", and is reported rather than dropped: the
-picker prints "· no coordinates — pick one from the list", and the alert
+picker prints "no coordinates — pick one from the list", and the alert
 status says "the saved location has no coordinates".
 
 The picker is the stock weather widget's — same geocoding, same

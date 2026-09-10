@@ -79,6 +79,95 @@ Panel {
   }
 
   // ---------------------------------------------------------------------------
+  // Settings page
+  // ---------------------------------------------------------------------------
+  //
+  // The rest of the manifest's preferences that the panel does not otherwise
+  // expose, gathered into a dedicated settings page like oma.quake's: the "S"
+  // key or the hint-cap at the foot of the panel opens it, the page replaces
+  // the map column while it is open, and it is the only home these values have
+  // — the alert controls that already live in their own sections are not
+  // repeated here.
+
+  property bool settingsOpen: false
+
+  readonly property int defaultZoomSetting: Settings.defaultZoom(settings)
+  readonly property bool showLabelInBar: Settings.showLabel(settings)
+  readonly property var viewOptions: Settings.VIEW_OPTIONS
+  readonly property var schemeOptions: RadarModel.COLOR_SCHEMES.map(function(s) { return s.name })
+  readonly property color settingsForeground: root.bar ? root.bar.foreground : Color.foreground
+
+  // A field owns the keys while it is focused — otherwise typing "s" to pick
+  // a colour would toggle the page shut in the middle of the edit. The
+  // location picker and the first-run prompt own them the same way.
+  readonly property bool settingsHasFocus: root.settingsOpen && (
+    (locationPicker && locationPicker.fieldFocused)
+    || (settingsViewField && (settingsViewField.activeFocus || settingsViewField.popupOpen))
+    || (settingsSchemeField && (settingsSchemeField.activeFocus || settingsSchemeField.popupOpen))
+    || (settingsZoomField && settingsZoomField.activeFocus))
+
+  function toggleSettings() {
+    if (root.editingLocation) root.cancelEditingLocation()
+    settingsOpen = !settingsOpen
+    // A re-opened page starts at the top, not wherever it was left by a
+    // tall screen that needed scrolling.
+    if (settingsOpen) Qt.callLater(function() { settingsPage.contentY = 0 })
+  }
+
+  onSettingsOpenChanged: if (!settingsOpen) Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+
+  // ---------------------------------------------------------------------------
+  // First-run location prompt
+  // ---------------------------------------------------------------------------
+  //
+  // The first time the panel is opened with no location at all, a question
+  // box asks for the city before the map does anything else. It shares the
+  // geocoder and the suggestion list with the settings picker, and its
+  // answer lands in the same weather.json through the same long-running
+  // omarchy-weather-location call. `locationPrompted` is set whether the
+  // answer was a city or a skip, so a fresh install is asked exactly once.
+
+  property bool locationPromptOpen: false
+  property string locationPromptQuery: ""
+
+  function openLocationPrompt() {
+    if (root.hasLocation) return
+    locationPromptQuery = ""
+    locationSuggestions = []
+    suggestionIndex = 0
+    locationPromptOpen = true
+    Qt.callLater(function() { locationPromptField.forceActiveFocus() })
+  }
+
+  // Skipped, not answered: mark the question asked so it never reappears.
+  function dismissLocationPrompt() {
+    locationPromptOpen = false
+    persistSetting("locationPrompted", true)
+    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  // Chosen or free-typed. Mirrors commitLocation but for the prompt's own
+  // field, and closes the box either way.
+  function commitLocationPrompt() {
+    var choice = RadarModel.locationCommit(locationPromptQuery, locationSuggestions, suggestionIndex)
+    locationPromptOpen = false
+    persistSetting("locationPrompted", true)
+    if (choice.name) persistLocation(choice.name, choice.latitude, choice.longitude)
+    else if (locationPromptQuery.trim() !== "") clearLocation()
+    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  function promptPickSuggestion(suggestion) {
+    if (!suggestion) return
+    locationPromptOpen = false
+    persistSetting("locationPrompted", true)
+    // Save the picked city with its coordinates straight away rather than
+    // round-tripping through the field, which would have lost them.
+    if (suggestion.name) persistLocation(suggestion.name, suggestion.latitude, suggestion.longitude)
+    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  // ---------------------------------------------------------------------------
   // Map state
   // ---------------------------------------------------------------------------
 
@@ -388,6 +477,9 @@ Panel {
   function startEditingLocation() {
     if (editingLocation) return
     editingLocation = true
+    // The picker lives on the settings page now, so reaching it opens that
+    // page too — clicking the header's location is a shortcut to the edit.
+    settingsOpen = true
     locationSuggestions = []
     suggestionIndex = 0
     locationPicker.query = root.locationName
@@ -444,8 +536,15 @@ Panel {
   // Debounced so typing a city name is one request per pause, not one per
   // keystroke. Only one curl is in flight at a time; a query that moved on
   // while a fetch was running is issued as soon as that one returns.
+  // Which field asked: the first-run prompt has its own field, the settings
+  // picker has the picker's.
+  function activeEditQuery() {
+    if (root.locationPromptOpen) return root.locationPromptQuery
+    return locationPicker.query
+  }
+
   function requestGeocode() {
-    var query = locationPicker.query.trim()
+    var query = root.activeEditQuery().trim()
     if (query.length < 2) {
       locationSuggestions = []
       return
@@ -473,8 +572,10 @@ Panel {
   function applyGeocodeResponse(exitCode, text) {
     // A failed search leaves no suggestions rather than stale ones: a list
     // from the previous query, under the letters just typed, is a wrong
-    // answer presented as a current one.
-    root.locationSuggestions = (exitCode === 0 && root.editingLocation)
+    // answer presented as a current one. The first-run prompt counts as a
+    // live edit too — it shares the same suggestion list.
+    var liveEdit = root.editingLocation || root.locationPromptOpen
+    root.locationSuggestions = (exitCode === 0 && liveEdit)
       ? RadarModel.parseGeocodingResults(text) : []
     root.suggestionIndex = 0
 
@@ -484,7 +585,7 @@ Panel {
     // find pending and active different, and go out again for the empty
     // string: a real call to the geocoder for nothing, after the field is
     // closed.
-    if (!root.editingLocation || root.geocodePendingQuery === "") return
+    if (!liveEdit || root.geocodePendingQuery === "") return
     if (root.geocodePendingQuery !== root.geocodeActiveQuery) Qt.callLater(root.startGeocode)
   }
 
@@ -702,7 +803,9 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     root.playing = false
+    root.locationPromptOpen = false
     if (root.editingLocation) root.cancelEditingLocation()
+    root.settingsOpen = false
     if (root.manifestHeld) {
       if (root.service && root.service.releaseManifest) root.service.releaseManifest()
       root.manifestHeld = false
@@ -733,6 +836,12 @@ Panel {
     if (hasLocation) recenter()
     showLatestFrame()
     applyDefaultView()
+
+    // A brand-new install with no location anywhere is asked for its city
+    // before anything else. Asked once, and only when there is genuinely
+    // nothing to look at.
+    if (!hasLocation && !Settings.locationPrompted(settings))
+      Qt.callLater(root.openLocationPrompt)
     // The CAMS overlay opens on ~now too, wherever it was left.
     if (activeLayer) {
       camsFrameIndex = CamsModel.nearestTimeIndex(CamsModel.layerSteps(activeLayer))
@@ -872,21 +981,28 @@ Panel {
     centerOnBar: true
     focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(560))
-    contentHeight: panel.fittedContentHeight(content.implicitHeight)
+    contentHeight: panel.fittedContentHeight(
+      (root.settingsOpen ? settingsContent.implicitHeight : content.implicitHeight)
+      + hintBar.implicitHeight + Style.space(12))
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
       // While the search field has focus its keystrokes are text, not
       // shortcuts: without this, typing a city name would scrub the
-      // timeline and zoom the map.
-      blocked: root.editingLocation
+      // timeline and zoom the map. Same for the settings fields, where
+      // "s" would otherwise shut the page mid-edit, and for the first-run
+      // prompt, where the question owns the whole keyboard.
+      blocked: root.editingLocation || root.settingsHasFocus || root.locationPromptOpen
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onReturnRequested: root.playing = !root.playing
 
       Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_Left) {
+        if (event.text === "s" || event.text === "S") {
+          root.toggleSettings()
+          event.accepted = true
+        } else if (event.key === Qt.Key_Left) {
           root.setTimelineIndex(Math.max(0, root.timelineIndex - 1))
           event.accepted = true
         } else if (event.key === Qt.Key_Right) {
@@ -905,214 +1021,642 @@ Panel {
         }
       }
 
-      Column {
-        id: content
-        width: parent.width
-        spacing: Style.space(10)
+      // The panel scrolls when its content is taller than the screen — the map
+      // column sits in here, and while the settings page is open this whole
+      // side hides in favour of it. Mouse drags inside the map still pan the
+      // map: its MouseArea accepts the press, which keeps the flick from
+      // winning.
+      Flickable {
+        id: panelFlick
+        anchors.fill: parent
+        anchors.bottomMargin: hintBar.height + Style.space(10)
+        visible: !root.settingsOpen
+        contentWidth: width
+        contentHeight: content.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
 
-        PanelHeader {
+        Column {
+          id: content
           width: parent.width
-          foreground: root.bar ? root.bar.foreground : Color.foreground
-          fetching: root.fetching
-        }
+          spacing: Style.space(10)
 
-        MapCanvas {
-          id: map
-          width: parent.width
-          height: root.mapHeight
-          bar: root.bar
-          basemap: root.basemap
-
-          centerLatitude: root.viewLatitude
-          centerLongitude: root.viewLongitude
-          zoom: root.zoom
-          overlaySourceZoom: root.overlaySourceZoom
-
-          tileUrlA: root.tileUrlA
-          tileUrlB: root.tileUrlB
-          radarOverlayVisible: root.radarMode
-
-          frameA: root.frameA
-          frameB: root.frameB
-          frameEpoch: root.frameEpoch
-          frontIsA: root.frontIsA
-          colorSchemeId: root.colorSchemeId
-          smoothTiles: root.smoothTiles
-
-          hasLocation: root.hasLocation
-          homeLatitude: root.homeLatitude
-          homeLongitude: root.homeLongitude
-          alertsEnabled: root.alertsEnabled
-          alertRadiusKm: root.alertRadiusKm
-
-          overlayUnavailable: root.service ? root.service.frameFailures > 0 : false
-          attribution: root.attribution
-
-          airOverlayVisible: root.shownAirLayerName !== ""
-          airLayerName: root.shownAirLayerName
-          airStepTime: root.shownAirStepTime
-
-          onDragged: function(latitude, longitude) {
-            root.viewLatitude = TileMath.constrainLatitude(latitude, root.zoom, root.mapHeight)
-            // Normalised as it is stored, so panning east indefinitely keeps
-            // the centre a real coordinate rather than letting it grow
-            // without bound. The ground draws the world repeatedly either
-            // way; this is about what everything else positioned against the
-            // centre sees.
-            root.viewLongitude = TileMath.wrapLongitude(longitude)
-            root.panned = true
-          }
-          onRecenterRequested: {
-            root.panned = false
-            root.recenter()
+          PanelHeader {
+            width: parent.width
+            foreground: root.bar ? root.bar.foreground : Color.foreground
+            fetching: root.fetching
+            locationName: root.locationName
+            onLocationClicked: root.startEditingLocation()
           }
 
-          // The staged frame finished loading: the swap may go ahead. The
-          // callLater matters — a model rebuild first destroys the old tile
-          // delegates and then creates the new ones, and between those halves
-          // the layer can briefly report ready with nothing counted yet.
-          // Deferring to the end of the event loop turn and looking again
-          // reads the settled count instead of the transient.
-          onBackReadyChanged: if (map.backReady) Qt.callLater(root.commitIfReady)
-          onZoomRequested: function(zoom, latitude, longitude) {
-            root.zoom = zoom
-            var wrapped = TileMath.wrapLongitude(longitude)
-            // Zooming towards the pointer moves the view, so it counts as
-            // panning — otherwise the next location update would snap the
-            // map back. Zooming on the centre moves nothing and must not.
-            var constrained = TileMath.constrainLatitude(latitude, zoom, root.mapHeight)
-            if (!TileMath.samePosition(constrained, wrapped, root.viewLatitude, root.viewLongitude)) {
-              root.viewLatitude = constrained
-              root.viewLongitude = wrapped
+          MapCanvas {
+            id: map
+            width: parent.width
+            height: root.mapHeight
+            bar: root.bar
+            basemap: root.basemap
+
+            centerLatitude: root.viewLatitude
+            centerLongitude: root.viewLongitude
+            zoom: root.zoom
+            overlaySourceZoom: root.overlaySourceZoom
+
+            tileUrlA: root.tileUrlA
+            tileUrlB: root.tileUrlB
+            radarOverlayVisible: root.radarMode
+
+            frameA: root.frameA
+            frameB: root.frameB
+            frameEpoch: root.frameEpoch
+            frontIsA: root.frontIsA
+            colorSchemeId: root.colorSchemeId
+            smoothTiles: root.smoothTiles
+
+            hasLocation: root.hasLocation
+            homeLatitude: root.homeLatitude
+            homeLongitude: root.homeLongitude
+            alertsEnabled: root.alertsEnabled
+            alertRadiusKm: root.alertRadiusKm
+
+            overlayUnavailable: root.service ? root.service.frameFailures > 0 : false
+            attribution: root.attribution
+
+            airOverlayVisible: root.shownAirLayerName !== ""
+            airLayerName: root.shownAirLayerName
+            airStepTime: root.shownAirStepTime
+
+            onDragged: function(latitude, longitude) {
+              root.viewLatitude = TileMath.constrainLatitude(latitude, root.zoom, root.mapHeight)
+              // Normalised as it is stored, so panning east indefinitely keeps
+              // the centre a real coordinate rather than letting it grow
+              // without bound. The ground draws the world repeatedly either
+              // way; this is about what everything else positioned against the
+              // centre sees.
+              root.viewLongitude = TileMath.wrapLongitude(longitude)
               root.panned = true
             }
+            onRecenterRequested: {
+              root.panned = false
+              root.recenter()
+            }
+
+            // The staged frame finished loading: the swap may go ahead. The
+            // callLater matters — a model rebuild first destroys the old tile
+            // delegates and then creates the new ones, and between those halves
+            // the layer can briefly report ready with nothing counted yet.
+            // Deferring to the end of the event loop turn and looking again
+            // reads the settled count instead of the transient.
+            onBackReadyChanged: if (map.backReady) Qt.callLater(root.commitIfReady)
+            onZoomRequested: function(zoom, latitude, longitude) {
+              root.zoom = zoom
+              var wrapped = TileMath.wrapLongitude(longitude)
+              // Zooming towards the pointer moves the view, so it counts as
+              // panning — otherwise the next location update would snap the
+              // map back. Zooming on the centre moves nothing and must not.
+              var constrained = TileMath.constrainLatitude(latitude, zoom, root.mapHeight)
+              if (!TileMath.samePosition(constrained, wrapped, root.viewLatitude, root.viewLongitude)) {
+                root.viewLatitude = constrained
+                root.viewLongitude = wrapped
+                root.panned = true
+              }
+            }
+
+            CoverageProbe {
+              id: coverageProbe
+              source: root.coverageProbeUrl
+              onResolved: function(covered) {
+                if (root.service && root.service.reportCoverage) root.service.reportCoverage(covered)
+                if (!covered) console.log("akash: no ground radar reaches the configured location")
+              }
+            }
           }
 
-          CoverageProbe {
-            id: coverageProbe
-            source: root.coverageProbeUrl
-            onResolved: function(covered) {
-              if (root.service && root.service.reportCoverage) root.service.reportCoverage(covered)
-              if (!covered) console.log("akash: no ground radar reaches the configured location")
+          // The map's legend, docked as a colour strip under the map: it names
+          // whichever ramp the map is drawing, in the same column and at the same
+          // width, so it reads as part of the map without covering any of it.
+          LegendStrip {
+            width: parent.width
+            bar: root.bar
+            mode: root.shownAirLayerName !== "" ? root.activeCategory : "radar"
+            layerLabel: root.activeLayer ? CamsModel.layerLabel(root.activeLayer) : ""
+            lowEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).low : ""
+            highEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).high : ""
+          }
+
+          LayerPicker {
+            width: parent.width
+            bar: root.bar
+            categories: root.chipCategories
+            activeCategory: root.activeCategory
+            layers: root.camsLayers
+            selectedLayerName: root.activeLayer ? root.activeLayer.name : ""
+
+            onCategoryChosen: function(id) { root.chooseCategory(id) }
+            onLayerChosen: function(layer) { root.chooseLayer(layer) }
+            onLayerCleared: root.clearAirOverlay()
+          }
+
+          Timeline {
+            width: parent.width
+            bar: root.bar
+            frames: root.timelineFrames
+            frameIndex: root.timelineIndex
+            playing: root.playing
+            frameLabel: root.timelineLabel
+            frameAgo: root.timelineAgo
+            isLatestFrame: root.timelineAtLatest
+            labelWidth: Style.space(96)
+            onPlayToggled: root.playing = !root.playing
+            onFrameRequested: function(index) { root.setTimelineIndex(index) }
+          }
+        }
+      }
+
+      // The settings page: a dedicated page that replaces the map column
+      // while it is open, reached by the S key or the hint cap at the foot.
+      // It swaps the whole panel rather than appending below the alert
+      // controls, so the controls are never far from the scroll and the
+      // page reads as its own screen. The main content above hides while
+      // it is open.
+      Flickable {
+        id: settingsPage
+        anchors.fill: parent
+        anchors.bottomMargin: hintBar.height + Style.space(10)
+        visible: root.settingsOpen
+        contentWidth: width
+        contentHeight: settingsContent.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+
+        Item {
+          width: parent.width
+          height: settingsContent.implicitHeight
+
+          Column {
+            id: settingsContent
+            width: parent.width
+            spacing: Style.space(10)
+
+            PanelSectionHeader {
+              text: "SETTINGS"
+              foreground: root.settingsForeground
+              fontFamily: Style.font.family
+            }
+
+            Column {
+              width: parent.width
+              spacing: Style.space(10)
+              leftPadding: Style.space(16)
+              rightPadding: Style.space(16)
+
+              Grid {
+                columns: 2
+                columnSpacing: Style.space(12)
+                rowSpacing: Style.space(10)
+                width: parent.width - parent.leftPadding - parent.rightPadding
+
+                Column {
+                  width: parent.width / 2 - Style.space(6)
+                  spacing: Style.space(4)
+
+                  Text {
+                    textFormat: Text.PlainText
+                    text: "OPEN PANEL ON"
+                    color: Qt.darker(root.settingsForeground, 1.4)
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    font.letterSpacing: 1
+                  }
+
+                  Dropdown {
+                    id: settingsViewField
+                    width: parent.width
+                    value: root.defaultView
+                    options: root.viewOptions
+                    foreground: root.settingsForeground
+                    fontFamily: Style.font.family
+                    showLabel: false
+                    onChanged: function(v) { root.persistSetting("defaultView", v) }
+                  }
+                }
+
+                Column {
+                  width: parent.width / 2 - Style.space(6)
+                  spacing: Style.space(4)
+
+                  Text {
+                    textFormat: Text.PlainText
+                    text: "COLOUR SCHEME"
+                    color: Qt.darker(root.settingsForeground, 1.4)
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    font.letterSpacing: 1
+                  }
+
+                  Dropdown {
+                    id: settingsSchemeField
+                    width: parent.width
+                    value: RadarModel.colorSchemeName(root.colorSchemeId)
+                    options: root.schemeOptions
+                    foreground: root.settingsForeground
+                    fontFamily: Style.font.family
+                    showLabel: false
+                    onChanged: function(v) { root.persistSetting("colorScheme", v) }
+                  }
+                }
+
+                Column {
+                  width: parent.width / 2 - Style.space(6)
+                  spacing: Style.space(4)
+
+                  Text {
+                    textFormat: Text.PlainText
+                    text: "DEFAULT ZOOM"
+                    color: Qt.darker(root.settingsForeground, 1.4)
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                    font.letterSpacing: 1
+                  }
+
+                  NumberField {
+                    id: settingsZoomField
+                    width: parent.width
+                    value: root.defaultZoomSetting
+                    from: RadarModel.MIN_RADAR_ZOOM
+                    to: RadarModel.MAX_MAP_ZOOM
+                    stepSize: 1
+                    foreground: root.settingsForeground
+                    fontFamily: Style.font.family
+                    label: ""
+                    onModified: function(v) { root.persistSetting("defaultZoom", v) }
+                  }
+                }
+              }
+
+              Row {
+                width: parent.width - parent.leftPadding - parent.rightPadding
+                spacing: Style.space(10)
+
+                // Three equal cells, "the row owns the click" rows in the kit
+                // idiom: the label is the setting, the switch rides its far edge.
+                Toggle {
+                  width: (parent.width - Style.space(20)) / 3
+                  label: "Smooth radar"
+                  foreground: root.settingsForeground
+                  accent: Color.accent
+                  checked: root.smoothTiles
+                  onClicked: root.persistSetting("smoothTiles", !root.smoothTiles)
+                }
+
+                Toggle {
+                  width: (parent.width - Style.space(20)) / 3
+                  label: "Distinguish snow"
+                  foreground: root.settingsForeground
+                  accent: Color.accent
+                  checked: root.showSnow
+                  onClicked: root.persistSetting("showSnow", !root.showSnow)
+                }
+
+                Toggle {
+                  width: (parent.width - Style.space(20)) / 3
+                  label: "Status text"
+                  description: "outlook beside the bar icon"
+                  foreground: root.settingsForeground
+                  accent: Color.accent
+                  checked: root.showLabelInBar
+                  onClicked: root.persistSetting("showLabel", !root.showLabelInBar)
+                }
+              }
+            }
+
+            PanelSeparator { width: parent.width }
+
+            // Location and the two watches live here too now, one rail under
+            // the display settings: the panel's main page is just the map,
+            // this page is everything else.
+            Column {
+              width: parent.width
+              spacing: Style.space(6)
+              leftPadding: Style.space(16)
+              rightPadding: Style.space(16)
+
+              PanelSectionHeader {
+                text: "LOCATION"
+                foreground: root.settingsForeground
+                fontFamily: Style.font.family
+              }
+
+              LocationPicker {
+                id: locationPicker
+                width: parent.width
+                spacing: Style.space(6)
+                bar: root.bar
+                locationName: root.locationName
+                locationState: root.locationState
+                coverageMissing: root.coverageMissing
+                editing: root.editingLocation
+                saving: root.savingLocation
+                suggestions: root.locationSuggestions
+                suggestionIndex: root.suggestionIndex
+
+                onEditRequested: root.startEditingLocation()
+                onCancelRequested: root.cancelEditingLocation()
+                onCommitRequested: root.commitLocation()
+                onClearRequested: root.clearLocation()
+                onQueryEdited: geocodeDebounce.restart()
+                onSuggestionHighlighted: function(index) { root.suggestionIndex = index }
+                onSuggestionPicked: function(suggestion) { root.pickSuggestion(suggestion) }
+              }
+            }
+
+            PanelSeparator { width: parent.width }
+
+            AlertControls {
+              width: parent.width
+              // Sections need more air between them than rows do inside one.
+              spacing: Style.space(12)
+              bar: root.bar
+              service: root.service
+              alertsEnabled: root.alertsEnabled
+              locationState: root.locationState
+              alertLeadMinutes: root.alertLeadMinutes
+              alertRadiusKm: root.alertRadiusKm
+              radiusPresets: root.radiusPresets
+              alertThreshold: root.alertThreshold
+              thresholdOptions: root.thresholdOptions
+
+              onAlertsToggled: {
+                var next = !root.alertsEnabled
+                root.persistSetting("alertsEnabled", next)
+                // Fire the first check immediately so enabling produces a
+                // visible result instead of up to ten minutes of silence.
+                if (next && root.service && root.service.checkNow) Qt.callLater(root.service.checkNow)
+              }
+              // The service watches for these and re-checks on its own, so a
+              // value edited into shell.json by hand behaves the same as one
+              // chosen here.
+              onRadiusChosen: function(km) { root.persistSetting("alertRadiusKm", km) }
+              onThresholdChosen: function(name) { root.persistSetting("alertMinIntensity", name) }
+
+              aqAlertsEnabled: root.aqAlertsEnabled
+              aqBandName: root.aqBandName
+              aqBandOptions: root.aqBandOptions
+
+              onAqAlertsToggled: {
+                var next = !root.aqAlertsEnabled
+                root.persistSetting("aqAlertsEnabled", next)
+                // Enabling answers with the reading in hand, if there is one —
+                // the probe cadence is hourly, too long to wait for a first word.
+                if (next && root.service && root.service.evaluateAqAlert) Qt.callLater(root.service.evaluateAqAlert)
+              }
+              onAqBandChosen: function(name) { root.persistSetting("aqAlertBand", name) }
             }
           }
         }
+      }
 
-        // The map's legend, docked as a colour strip under the map: it names
-        // whichever ramp the map is drawing, in the same column and at the same
-        // width, so it reads as part of the map without covering any of it.
-        LegendStrip {
-          width: parent.width
-          bar: root.bar
-          mode: root.shownAirLayerName !== "" ? root.activeCategory : "radar"
-          layerLabel: root.activeLayer ? CamsModel.layerLabel(root.activeLayer) : ""
-          lowEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).low : ""
-          highEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).high : ""
-        }
+      Row {
+        id: hintBar
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: Style.space(16)
+        anchors.rightMargin: Style.space(16)
+        spacing: Style.space(10)
 
-        LayerPicker {
-          width: parent.width
-          bar: root.bar
-          categories: root.chipCategories
-          activeCategory: root.activeCategory
-          layers: root.camsLayers
-          selectedLayerName: root.activeLayer ? root.activeLayer.name : ""
-
-          onCategoryChosen: function(id) { root.chooseCategory(id) }
-          onLayerChosen: function(layer) { root.chooseLayer(layer) }
-          onLayerCleared: root.clearAirOverlay()
-        }
-
-        Timeline {
-          width: parent.width
-          bar: root.bar
-          frames: root.timelineFrames
-          frameIndex: root.timelineIndex
-          playing: root.playing
-          frameLabel: root.timelineLabel
-          frameAgo: root.timelineAgo
-          isLatestFrame: root.timelineAtLatest
-          labelWidth: Style.space(96)
-          onPlayToggled: root.playing = !root.playing
-          onFrameRequested: function(index) { root.setTimelineIndex(index) }
-        }
-
-        PanelSeparator { width: parent.width }
-
-        // Separator, then a small-caps heading at the content edge, then the
-        // rows inset under it. That rail is the shape every dense
-        // first-party panel is built on.
-        PanelSectionHeader {
-          text: "LOCATION"
-          foreground: root.bar ? root.bar.foreground : Color.foreground
-          fontFamily: Style.font.family
-        }
-
-        LocationPicker {
-          id: locationPicker
-          width: parent.width
+        Row {
           spacing: Style.space(6)
-          bar: root.bar
-          locationName: root.locationName
-          locationState: root.locationState
-          coverageMissing: root.coverageMissing
-          editing: root.editingLocation
-          saving: root.savingLocation
-          suggestions: root.locationSuggestions
-          suggestionIndex: root.suggestionIndex
+          KeyCap { label: "S"; onActivated: root.toggleSettings() }
+          Text {
+            textFormat: Text.PlainText
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.settingsOpen ? "close settings" : "settings"
+            color: Qt.darker(root.settingsForeground, 1.5)
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
 
-          onEditRequested: root.startEditingLocation()
-          onCancelRequested: root.cancelEditingLocation()
-          onCommitRequested: root.commitLocation()
-          onClearRequested: root.clearLocation()
-          onQueryEdited: geocodeDebounce.restart()
-          onSuggestionHighlighted: function(index) { root.suggestionIndex = index }
-          onSuggestionPicked: function(suggestion) { root.pickSuggestion(suggestion) }
+            // The label is a hint, but a clickable one: the keycap beside it
+            // already toggles, and the whole affordance should too, the way
+            // oma.quake's hint row works.
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleSettings()
+            }
+          }
+        }
+      }
+
+      // The first-run question box: a dim scrim over the whole panel with a
+      // centred card asking for the city. It sits above both pages and the
+      // hint bar. Clicking the scrim answers nothing except "later".
+      Rectangle {
+        id: locationPromptScrim
+        visible: root.locationPromptOpen
+        anchors.fill: parent
+        color: Util.alpha(root.settingsForeground, 0.18)
+        z: 100
+
+        MouseArea {
+          anchors.fill: parent
+          onClicked: root.dismissLocationPrompt()
         }
 
-        PanelSeparator { width: parent.width }
+        Rectangle {
+          id: locationPromptCard
+          anchors.centerIn: parent
+          width: Math.min(Style.space(380), parent.width - Style.space(32))
+          height: locationPromptContent.implicitHeight + Style.space(24) * 2
+          radius: Style.cornerRadius
+          color: Color.popups.background
+          border.color: Color.popups.border
+          border.width: 1
 
-        AlertControls {
-          width: parent.width
-          // Sections need more air between them than rows do inside one.
-          spacing: Style.space(12)
-          bar: root.bar
-          service: root.service
-          alertsEnabled: root.alertsEnabled
-          locationState: root.locationState
-          alertLeadMinutes: root.alertLeadMinutes
-          alertRadiusKm: root.alertRadiusKm
-          radiusPresets: root.radiusPresets
-          alertThreshold: root.alertThreshold
-          thresholdOptions: root.thresholdOptions
-
-          onAlertsToggled: {
-            var next = !root.alertsEnabled
-            root.persistSetting("alertsEnabled", next)
-            // Fire the first check immediately so enabling produces a
-            // visible result instead of up to ten minutes of silence.
-            if (next && root.service && root.service.checkNow) Qt.callLater(root.service.checkNow)
+          // Swallow clicks on the card's non-interactive spaces so they do
+          // not fall through to the scrim and dismiss the box mid-read.
+          MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
           }
-          // The service watches for these and re-checks on its own, so a
-          // value edited into shell.json by hand behaves the same as one
-          // chosen here.
-          onRadiusChosen: function(km) { root.persistSetting("alertRadiusKm", km) }
-          onThresholdChosen: function(name) { root.persistSetting("alertMinIntensity", name) }
 
-          aqAlertsEnabled: root.aqAlertsEnabled
-          aqBandName: root.aqBandName
-          aqBandOptions: root.aqBandOptions
+          Column {
+            id: locationPromptContent
+            width: parent.width - Style.space(24) * 2
+            anchors.centerIn: parent
+            spacing: Style.space(10)
 
-          onAqAlertsToggled: {
-            var next = !root.aqAlertsEnabled
-            root.persistSetting("aqAlertsEnabled", next)
-            // Enabling answers with the reading in hand, if there is one —
-            // the probe cadence is hourly, too long to wait for a first word.
-            if (next && root.service && root.service.evaluateAqAlert) Qt.callLater(root.service.evaluateAqAlert)
+            Text {
+              textFormat: Text.PlainText
+              width: parent.width
+              text: "Where are you?"
+              color: root.settingsForeground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.title
+              font.bold: true
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              textFormat: Text.PlainText
+              width: parent.width
+              text: "Akash has no location yet. Set a city and the radar, " +
+                    "alerts and air-quality reading all know where to look."
+              color: Qt.darker(root.settingsForeground, 1.5)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+
+            TextField {
+              id: locationPromptField
+              width: parent.width
+              placeholderText: "Search city"
+              foreground: root.settingsForeground
+              accent: Color.accent
+              font.family: Style.font.family
+              text: root.locationPromptQuery
+
+              onTextChanged: {
+                root.locationPromptQuery = text
+                geocodeDebounce.restart()
+              }
+
+              Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Escape) {
+                  root.dismissLocationPrompt()
+                  event.accepted = true
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                  root.commitLocationPrompt()
+                  event.accepted = true
+                } else if (event.key === Qt.Key_Down) {
+                  if (root.suggestionIndex < root.locationSuggestions.length - 1) {
+                    root.suggestionIndex = root.suggestionIndex + 1
+                  }
+                  event.accepted = true
+                } else if (event.key === Qt.Key_Up) {
+                  if (root.suggestionIndex > 0) root.suggestionIndex = root.suggestionIndex - 1
+                  event.accepted = true
+                }
+              }
+            }
+
+            Repeater {
+              model: root.locationSuggestions
+
+              Rectangle {
+                required property var modelData
+                required property int index
+
+                readonly property bool highlighted: index === root.suggestionIndex
+
+                width: parent.width
+                height: promptSuggestionRow.implicitHeight + Style.space(8)
+                radius: Style.space(4)
+                color: highlighted ? Style.hoverFillFor(root.settingsForeground, Color.accent) : "transparent"
+
+                Row {
+                  id: promptSuggestionRow
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.leftMargin: Style.space(6)
+                  anchors.rightMargin: Style.space(6)
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(8)
+
+                  Text {
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    width: parent.width / 2
+                    text: modelData.name
+                    color: highlighted
+                      ? Style.hoverStateColor(root.settingsForeground, Color.accent)
+                      : root.settingsForeground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.body
+                  }
+
+                  Text {
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    width: parent.width - parent.width / 2 - Style.space(8)
+                    text: modelData.description
+                    color: Qt.darker(root.settingsForeground, 1.5)
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.bodySmall
+                  }
+                }
+
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onPositionChanged: root.suggestionIndex = index
+                  onClicked: root.promptPickSuggestion(modelData)
+                }
+              }
+            }
+
+            Row {
+              width: parent.width
+              spacing: Style.space(8)
+
+              Button {
+                text: "Skip"
+                fontSize: Style.font.bodySmall
+                fontFamily: Style.font.family
+                foreground: root.settingsForeground
+                background: Color.popups.background
+                bordered: true
+                onClicked: root.dismissLocationPrompt()
+              }
+
+              Button {
+                text: "Save city"
+                fontSize: Style.font.bodySmall
+                fontFamily: Style.font.family
+                foreground: root.settingsForeground
+                accent: Color.accent
+                background: Color.popups.background
+                onClicked: root.commitLocationPrompt()
+              }
+            }
           }
-          onAqBandChosen: function(name) { root.persistSetting("aqAlertBand", name) }
         }
       }
     }
   }
+
+  // The keycap hint chip, as oma.quake draws it: a bordered surface around a
+  // caption letter, clickable. Inline components declared inside the root stay
+  // in scope for the panel tree.
+  component KeyCap: BorderSurface {
+    signal activated()
+    property alias label: keyText.text
+
+    implicitWidth: Math.max(keyText.implicitWidth + Style.space(8), implicitHeight)
+    implicitHeight: keyText.implicitHeight + Style.space(4)
+    color: capMouse.containsMouse ? Style.hoverFillFor(root.settingsForeground, Color.accent) : "transparent"
+    borderSpec: Border.flat(Qt.darker(root.settingsForeground, 1.5), Style.normalBorderWidth)
+    radius: Style.space(3)
+
+    Text {
+      id: keyText
+      textFormat: Text.PlainText
+      anchors.centerIn: parent
+      color: Qt.darker(root.settingsForeground, 1.5)
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+
+    MouseArea {
+      id: capMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.activated()
+    }
+  }
+
 }

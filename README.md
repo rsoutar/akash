@@ -135,7 +135,9 @@ NO₂ at 90, O₃ at 120. The thresholds travel with the species, not the number
 
 ## Location
 
-Click the city name at the bottom of the panel and type to search.
+Click the city name in the panel header — it opens the settings page with the
+location picker already in its search box. If no location is set at all, the
+first time you open the panel a question box asks you for your city first.
 
 The picker is the stock weather widget's — same geocoding, same suggestions —
 and it writes to the same file, so a city chosen here moves the stock weather
@@ -151,8 +153,9 @@ namesakes elsewhere.
 
 ## Alerts
 
-Alerts are **off by default**, both of them. Turn them on from the switches
-in the panel, or in the widget's settings.
+Alerts are **off by default**, both of them. Turn them on from their switches
+on the panel's settings page (the S key or the "settings" hint at the foot
+of the panel), or in the widget's settings.
 
 **Storm alerts** watch the Open-Meteo forecast every ten minutes out to a
 radius of your choosing — 100 km by default, roughly two hours of warning at
