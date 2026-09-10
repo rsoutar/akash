@@ -709,6 +709,11 @@ Item {
   property bool checking: false
   property int consecutiveFailures: 0
 
+  // Any network work still in flight, so the panel header can say "Fetching"
+  // instead of "Live". A notification is not a fetch, so notifyProc is not
+  // counted.
+  readonly property bool fetching: manifestProc.running || camsInitProc.running || aqProc.running || forecastProc.running
+
   // Highest severity inside the lead window: 0 clear, 1 light, 2 moderate,
   // 3 heavy, 4 severe.
   property int outlookLevel: 0

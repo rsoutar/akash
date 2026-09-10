@@ -63,6 +63,24 @@ Item {
   property int pending: 0
   readonly property bool ready: pending === 0
 
+  // Qt's Image has no timeout, so a request that never answers would leave its
+  // tile counted in `pending` for the life of the delegate — pinning the panel
+  // header to "Fetching" and the crossfade to its watchdog forever. When the
+  // count has stood still this long, the outstanding tiles are written off.
+  // A late arrival still settles cleanly: `settle()` never drives it negative.
+  readonly property int stallMs: 6000
+  property double lastProgressMs: 0
+  onPendingChanged: lastProgressMs = Date.now()
+
+  Timer {
+    interval: 1000
+    repeat: true
+    running: root.pending > 0
+    onTriggered: {
+      if (Date.now() - root.lastProgressMs >= root.stallMs) root.pending = 0
+    }
+  }
+
   signal tileFailed()
 
   clip: true
