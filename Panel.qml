@@ -11,7 +11,7 @@ import "lib/Settings.js" as Settings
 import "lib/TileMath.js" as TileMath
 import "lib/RadarModel.js" as RadarModel
 
-// The aeroradar panel.
+// The akash panel.
 //
 // Opens centred on the location Omarchy already knows about, stacks the
 // latest radar frame over a basemap, and can play the last two hours as a
@@ -26,8 +26,8 @@ import "lib/RadarModel.js" as RadarModel
 // component in ui/; everything computed is a function in lib/.
 Panel {
   id: root
-  moduleName: "aeroradar"
-  ipcTarget: "aeroradar"
+  moduleName: "akash"
+  ipcTarget: "akash"
   manageIpc: false
 
   property var anchorItem: null
@@ -949,7 +949,7 @@ Panel {
             source: root.coverageProbeUrl
             onResolved: function(covered) {
               if (root.service && root.service.reportCoverage) root.service.reportCoverage(covered)
-              if (!covered) console.log("aeroradar: no ground radar reaches the configured location")
+              if (!covered) console.log("akash: no ground radar reaches the configured location")
             }
           }
         }

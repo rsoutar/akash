@@ -8,7 +8,7 @@ import "lib/CamsModel.js" as CamsModel
 import "lib/RadarModel.js" as RadarModel
 import "lib/Settings.js" as Settings
 
-// Headless singleton behind aeroradar.
+// Headless singleton behind akash.
 //
 // A bar widget is instantiated once per monitor, so anything that polls lives
 // here: the shell mounts exactly one service per plugin, which keeps a
@@ -285,7 +285,7 @@ Item {
     root.basemapDecoder = null
     root.basemap = null
     root.basemapFailed = true
-    console.warn("aeroradar: data/basemap.bin " + why)
+    console.warn("akash: data/basemap.bin " + why)
   }
 
   // One step per frame, for as long as there is a decoder. A QML Timer is
@@ -334,7 +334,7 @@ Item {
   property var camsState: null
   readonly property bool camsReady: camsCaps !== null && camsState !== null
   readonly property string camsRegion: camsState ? String(camsState.region || "europe") : "europe"
-  readonly property string camsConfigDir: Quickshell.env("HOME") + "/.config/omarchy/aeroradar"
+  readonly property string camsConfigDir: Quickshell.env("HOME") + "/.config/omarchy/akash"
 
   function ensureCams() {
     if (camsReady || camsInitProc.running) return
@@ -349,7 +349,7 @@ Item {
       // real answer; read them whether or not the refresh itself was clean.
       camsCapsFile.path = root.camsConfigDir + "/caps.json"
       camsStateFile.path = root.camsConfigDir + "/state.json"
-      if (exitCode !== 0) console.warn("aeroradar: cams.py init failed (" + exitCode + ")")
+      if (exitCode !== 0) console.warn("akash: cams.py init failed (" + exitCode + ")")
     }
   }
 
@@ -361,7 +361,7 @@ Item {
         root.camsCaps = JSON.parse(text())
       } catch (e) {
         root.camsCaps = null
-        console.warn("aeroradar: caps.json could not be parsed")
+        console.warn("akash: caps.json could not be parsed")
       }
     }
     onLoadFailed: root.camsCaps = null
@@ -603,7 +603,7 @@ Item {
     // Not Disturb when critical, no click action, the plugin's own glyph.
     notifyProc.command = [
       "omarchy-notification-send",
-      "--app-name", "Aeroradar",
+      "--app-name", "Akash",
       "-g", Glyphs.RADAR,
       "-u", text.urgency,
       text.headline,
@@ -907,7 +907,7 @@ Item {
     // answers a question the reader did not ask.
     notifyProc.command = [
       "omarchy-notification-send",
-      "--app-name", "Aeroradar",
+      "--app-name", "Akash",
       // The same glyph the bar widget wears, so the toast is recognisably
       // from this plugin before a word of it is read.
       "-g", Glyphs.RADAR,

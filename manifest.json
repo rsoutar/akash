@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "aeroradar",
-  "name": "Aeroradar",
+  "id": "akash",
+  "name": "Akash",
   "version": "0.1.0",
-  "author": "aeroradar contributors",
+  "author": "akash contributors",
   "license": "MIT",
-  "description": "Live weather radar and Copernicus CAMS air quality on one map in the Omarchy bar, with storm and air-quality alerts. No account, no API key.",
+  "description": "Akash (อากาศ, 'sky/ether') — live weather radar and Copernicus CAMS air quality on one map in the Omarchy bar, with storm and air-quality alerts. No account, no API key.",
   "kinds": [
     "service",
     "bar-widget"
@@ -15,8 +15,8 @@
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
-    "displayName": "Aeroradar",
-    "description": "Weather radar plus CAMS air quality, pollen and UV on one map, with optional storm and air-quality alerts.",
+    "displayName": "Akash",
+    "description": "Akash (อากาศ) — weather radar plus CAMS air quality, pollen and UV on one map, with optional storm and air-quality alerts.",
     "category": "Info",
     "allowMultiple": false,
     "defaultSection": "right",

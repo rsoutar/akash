@@ -1,4 +1,4 @@
-# aeroradar — plan
+# Akash — plan
 
 **One Omarchy Quattro (Quickshell) plugin: live weather radar + Copernicus CAMS air quality on a single map, with an AQ bar readout and storm + air-quality alerts. No API keys, no accounts.**
 
@@ -29,7 +29,7 @@ Based on (both MIT-licensed, credited in README):
   - Point values (bar tooltip): WMS `GetFeatureInfo` at home lat/lon — small EPSG:3857 box (~20 km half-box), centre pixel, parse `Value: <num> <unit>` from `text/plain`.
   - Legends: `GetLegend` PNG, decoded with a hand-rolled PNG reader to a discrete hex-colour swatch strip.
 - State in `~/.config/omarchy/kuki/state.json`; plugin touches nothing else.
-- Basemap: CARTO tiles (needs network) — aeroradar deliberately does **not** copy this.
+- Basemap: CARTO tiles (needs network) — Akash deliberately does **not** copy this.
 
 ### omarchy-weather-radar — RainViewer + Open-Meteo
 
@@ -45,7 +45,7 @@ Based on (both MIT-licensed, credited in README):
 ## Architecture
 
 ```
-aeroradar/
+akash/
   manifest.json
   BarWidget.qml          # radar-scope icon + AQ pill (value, level colour, tooltip)
   Panel.qml              # panel state/lifecycle, IPC handler
@@ -81,7 +81,7 @@ aeroradar/
   - *Storm*: upstream bands, 5-point sampling, CAPE promotion, radius rings.
   - *Air quality*: threshold on the tracked layer at the home point (default PM2.5 > 35 µg/m³), evaluated against the hourly CAMS forecast steps; notify once, escalate-only re-notify, re-arm when the level drops back.
 - **Location** shared with the stock weather widget via `weather.json` + `omarchy-weather-location`; both directions stay in sync by file watch + reload-on-save.
-- **State**: plugin-owned files only, under `~/.config/omarchy/aeroradar/` (`state.json`, `caps.json`).
+- **State**: plugin-owned files only, under `~/.config/omarchy/akash/` (`state.json`, `caps.json`).
 - **Requests**: `curl` with per-endpoint byte ceilings; the Python helper handles the XML and `GetFeatureInfo` paths. Polling only in `Service.qml`.
 
 ## Data & attribution

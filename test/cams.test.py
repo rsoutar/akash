@@ -30,11 +30,11 @@ sys.modules["cams"] = spec.loader.exec_module(cams) or cams
 class CacheStaleness(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        os.environ["AERORADAR_CONFIG_DIR"] = self.tmp.name
+        os.environ["AKASH_CONFIG_DIR"] = self.tmp.name
         importlib.reload(cams)
 
     def tearDown(self):
-        del os.environ["AERORADAR_CONFIG_DIR"]
+        del os.environ["AKASH_CONFIG_DIR"]
         self.tmp.cleanup()
 
     def write_cache(self, payload):

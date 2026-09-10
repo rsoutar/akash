@@ -1,4 +1,4 @@
-# Aeroradar design
+# Akash design
 
 How a change, feature, or fix should behave.
 
@@ -86,7 +86,7 @@ that reads stdout back into the shell process is bounded the same way, and
 `test/streams.test.js` pins each stream and its ceiling.
 
 Deliberate preferences live in the widget's shell.json entry, managed by the
-`omarchy` CLI; session restore lives in `~/.config/omarchy/aeroradar/state.json`,
+`omarchy` CLI; session restore lives in `~/.config/omarchy/akash/state.json`,
 written atomically (temp file, fsync, rename) by cams.py. A setting the code
 cannot act on is named rather than silently defaulted: an unrecognised band
 name falls back to the default but is reported, and an alert radius outside

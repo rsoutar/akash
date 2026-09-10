@@ -21,7 +21,7 @@
 #
 # Needs `qs` (Quickshell), which is why CI runs this job in an Arch container
 # rather than on ubuntu-latest. Skips where there is no `qs`, so the suite still
-# runs on a machine without it; AERORADAR_REQUIRE_QS turns that skip into a
+# runs on a machine without it; AKASH_REQUIRE_QS turns that skip into a
 # failure, which is what CI sets.
 
 set -uo pipefail
@@ -30,11 +30,11 @@ cd "$(dirname "$0")/.."
 plugin=$PWD
 
 if ! command -v qs > /dev/null 2>&1; then
-  if [[ -n ${AERORADAR_REQUIRE_QS:-} ]]; then
-    echo "AERORADAR_REQUIRE_QS is set and there is no qs on PATH" >&2
+  if [[ -n ${AKASH_REQUIRE_QS:-} ]]; then
+    echo "AKASH_REQUIRE_QS is set and there is no qs on PATH" >&2
     exit 1
   fi
-  echo "no qs on PATH; skipping (set AERORADAR_REQUIRE_QS to make this fatal)"
+  echo "no qs on PATH; skipping (set AKASH_REQUIRE_QS to make this fatal)"
   exit 0
 fi
 
