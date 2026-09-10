@@ -324,34 +324,24 @@ test("intensity labels follow the calibrated bands", () => {
 
 // ------------------------------------------------------------------ legend
 
-test("the legend names the painted rungs of the intensity ladder", () => {
-  const bands = RadarModel.radarLegendBands()
-  // "Clear" paints nothing and "severe" is just the far end of heavy, so the
-  // legend carries the three rungs that have a colour of their own.
-  assert.deepStrictEqual(bands.map(b => b.name),
-    ["light", "moderate", "heavy"])
-  assert.deepStrictEqual(bands.map(b => b.value),
-    [RadarModel.INTENSITY_LIGHT, RadarModel.INTENSITY_MODERATE,
-     RadarModel.INTENSITY_HEAVY])
+test("the legend keys the ramp as three equal colour families", () => {
+  const families = RadarModel.radarLegendFamilies()
+  // A legend is a key, not a histogram: the grey tans, the blues and the
+  // warm cores each get one third of the bar, in that order.
+  assert.deepStrictEqual(families.map(f => f.name),
+    ["Light", "Moderate", "Heavy"])
+  assert.strictEqual(families.length, 3)
 })
 
-test("every legend rung sits on the ramp it names", () => {
-  // The ladder's low rung is 0; the strongest echo the tile can carry is 255.
-  // Each legend name lands between the two, in order — a legend whose labels
-  // are out of order would name the ramp wrongly.
-  for (const band of RadarModel.radarLegendBands()) {
-    const fraction = RadarModel.radarLegendFraction(band.value)
-    assert.ok(fraction >= 0 && fraction <= 1, band.name)
-  }
-  const fractions = RadarModel.radarLegendBands()
-    .map(b => RadarModel.radarLegendFraction(b.value))
-  assert.ok(fractions.every((f, i) => i === 0 || f > fractions[i - 1]),
-    "fainter bands sit left of stronger ones")
-
-  assert.strictEqual(RadarModel.radarLegendFraction(0), 0)
-  assert.strictEqual(RadarModel.radarLegendFraction(255), 1)
-  assert.strictEqual(RadarModel.radarLegendFraction(-5), 0)
-  assert.strictEqual(RadarModel.radarLegendFraction(null), 0)
+test("the family slices cover every stop exactly once", () => {
+  const stops = RadarModel.RADAR_GRADIENT_STOPS
+  const families = RadarModel.radarLegendFamilies()
+  // Contiguous, non-overlapping slices that rebuild the palette in order —
+  // a stop dropped or doubled would leave a hole or a seam in the ramp.
+  const rebuilt = families.reduce((all, f) => all.concat(f.stops), [])
+  assert.deepStrictEqual(rebuilt, stops)
+  assert.ok(families.every(f => f.stops.length > 0),
+    "an empty family would paint a blank third")
 })
 
 test("the legend ramp is the palette the tile quantises to", () => {
@@ -371,14 +361,17 @@ test("the legend ramp reads faint on the left, strongest on the right", () => {
   // strongest is the darkest red in a storm core. An earlier table had that
   // dark red first, which put the heaviest rain at the faint end of the
   // legend — this test pins both ends so the mistake cannot return.
-  const stops = RadarModel.RADAR_GRADIENT_STOPS
-  assert.strictEqual(stops[0], "#636159", "the faintest tan leads the ramp")
-  assert.strictEqual(stops[stops.length - 1], "#5d0000",
+  const families = RadarModel.radarLegendFamilies()
+  assert.strictEqual(families[0].stops[0], "#636159", "the faintest tan leads the ramp")
+  const last = families[families.length - 1].stops
+  assert.strictEqual(last[last.length - 1], "#5d0000",
     "the darkest red closes the ramp")
 
-  // Every stop carries its place on the 0-255 scale, strictly climbing so a
-  // cell painted across its own share of the bar never doubles back.
+  // Every stop carries its place on the 0-255 scale, strictly climbing so the
+  // ramp never doubles back. The legend no longer lays cells out by these, but
+  // the measured alpha ladder is the record the family boundaries come from.
   const values = RadarModel.RADAR_STOP_VALUES
+  const stops = RadarModel.RADAR_GRADIENT_STOPS
   assert.strictEqual(values.length, stops.length,
     "one value per colour, in the same order")
   assert.ok(values.every((v, i) => i === 0 || v > values[i - 1]),
@@ -387,27 +380,6 @@ test("the legend ramp reads faint on the left, strongest on the right", () => {
     "bin values sit on the 0-255 scale")
   assert.strictEqual(values[0], 20, "the faintest tan sits at the tile's lowest alpha")
   assert.strictEqual(values[values.length - 1], 255)
-})
-
-test("legend rungs land on the tan bins they name", () => {
-  // The tan bins' values are the alphas the tiles carry, so each rung value
-  // calibrated at 60/120/170 must land inside the cell of a tan bin — never
-  // on the opaque bins whose values are only estimates — and the moderate
-  // and heavy rungs sit on the tan measured at exactly their alpha.
-  const stops = RadarModel.RADAR_GRADIENT_STOPS
-  const values = RadarModel.RADAR_STOP_VALUES
-  const tanCount = 25
-  for (const band of RadarModel.radarLegendBands()) {
-    const value = band.value
-    let cell = 0
-    while (cell < values.length - 1 && (values[cell] + values[cell + 1]) / 2 < value) cell++
-    assert.ok(cell < tanCount,
-      `${band.name} (${value}) lands on a measured tan bin, not an estimate`)
-  }
-  assert.strictEqual(stops[values.indexOf(RadarModel.INTENSITY_MODERATE)], "#aa9e79",
-    "moderate lands on the alpha-120 tan")
-  assert.strictEqual(stops[values.indexOf(RadarModel.INTENSITY_HEAVY)], "#d6c88f",
-    "heavy lands on the alpha-170 tan")
 })
 
 test("a transparent centre pixel means a ground radar reaches here", () => {

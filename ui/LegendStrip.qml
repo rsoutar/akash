@@ -14,13 +14,16 @@ import "../lib/CamsModel.js" as CamsModel
 // keeps its own, briefer language.
 //
 // Colours here are data, not chrome: the radar bar is painted from the palette
-// the tile actually renders (`RadarModel.radarGradientStops`), and the air bar
+// the tile actually renders (`RadarModel.radarLegendFamilies`), and the air bar
 // from the EEA bands (`CamsModel.BAND_COLORS`), so the legend stays faithful to
-// the picture the way DESIGN.md's Picture section demands. Every label is
-// drawn in the theme's ink so the strip reads on a light Omarchy theme and a
-// dark one. The ends — "Cleaner → More polluted", "Less pollen → More pollen",
-// "Trace" to "Severe" — are passed in by the panel, which owns which category
-// the map is showing.
+// the picture the way DESIGN.md's Picture section demands. The radar ramp is a
+// key rather than a histogram: its three colour families — grey tans, blues,
+// yellow-through-red — share the strip equally, because laying it out by the
+// tile's alpha scale would give the near-identical tans three quarters of the
+// bar. Every label is drawn in the theme's ink so the strip reads on a light
+// Omarchy theme and a dark one. The ends — "Cleaner → More polluted", "Less
+// pollen → More pollen", "Trace" to "Severe" — are passed in by the panel,
+// which owns which category the map is showing.
 Item {
   id: root
 
@@ -28,10 +31,10 @@ Item {
   // id) paints the CAMS bands under that category's name.
   property string mode: "radar"
 
-  // Exposed so the legend names what it shows: the palette the radar is
-  // requested in, the CAMS layer the air overlay is drawn from, and the two
-  // words for what the ends of the scale mean.
-  property string schemeName: ""
+  // Exposed so the legend names what it shows: the CAMS layer the air overlay
+  // is drawn from and the two words for what the ends of the scale mean. The
+  // radar ramp is one palette whichever scheme is requested, so it takes no
+  // scheme name.
   property string layerLabel: ""
   property string lowEnd: ""
   property string highEnd: ""
@@ -42,28 +45,27 @@ Item {
   readonly property var airRows: CamsModel.airQualityLegend()
 
   readonly property string title: {
-    if (mode === "radar") return "Radar · " + schemeName
+    if (mode === "radar") return "Radar"
     var category = CamsModel.CATEGORY_LABELS[mode] || "Air quality"
     return layerLabel !== "" ? category + " · " + layerLabel : category
   }
 
-  // One named rung of whichever ramp is showing. Radar names come from the
-  // intensity ladder the band table owns and sit at the band's own place on
-  // the 0-255 scale; air names are the EEA rungs, spread evenly over the six
-  // band colours.
+  // One named rung of whichever ramp is showing. Radar names are the three
+  // colour families, each centred on the equal third it paints; air names are
+  // the three levels the six EEA bands pair into, centred on their thirds too.
   readonly property var tiers: {
     if (mode === "radar") {
-      var bands = RadarModel.radarLegendBands()
+      var families = RadarModel.radarLegendFamilies()
       var tiers = []
-      for (var i = 0; i < bands.length; i++) {
-        tiers.push({ name: bands[i].name, fraction: RadarModel.radarLegendFraction(bands[i].value) })
+      for (var i = 0; i < families.length; i++) {
+        tiers.push({ name: families[i].name, fraction: (i + 0.5) / families.length })
       }
       return tiers
     }
-    var rows = airRows
+    var airTiers = CamsModel.legendTiers()
     var out = []
-    for (var k = 0; k < rows.length; k++) {
-      out.push({ name: rows[k].name, fraction: rows.length === 1 ? 0 : rows[k].index / (rows.length - 1) })
+    for (var k = 0; k < airTiers.length; k++) {
+      out.push({ name: airTiers[k].name, fraction: (k + 0.5) / airTiers.length })
     }
     return out
   }
@@ -106,10 +108,11 @@ Item {
     width: root.width - root.pad * 2
   }
 
-  // The ramp itself, painted from the palette the tile renders in. RainViewer
-  // quantises the ramp to a handful of steps and so does this: the paint draws
-  // one solid run per stop rather than a smooth gradient two timers' worth of
-  // pixels were squashed to.
+  // The ramp itself, painted from the palette the tile renders in. The radar
+  // ramp is keyed by colour family: each family owns an equal third of the bar
+  // and paints its stops across that third, so grey tans no longer crowd the
+  // blues and reds off the end. The one-pixel overlap between cells closes the
+  // hairline seams rounding would otherwise leave.
   Canvas {
     id: ramp
     x: root.pad
@@ -127,22 +130,16 @@ Item {
       if (width <= 0 || height <= 0) return
 
       if (root.mode === "radar") {
-        var stops = RadarModel.RADAR_GRADIENT_STOPS
-        var values = RadarModel.RADAR_STOP_VALUES
-        if (stops.length === 0) return
-        // Each cell spans its own share of the 0-255 scale the bins sit on,
-        // bounded by the midpoints of its neighbours, so a label anchored at
-        // value/255 lands on the colour of the bin that value belongs to.
-        // The first cell reaches back to the strip's edge and the last runs
-        // to the right end, so the ramp fills the bar it lives in.
-        for (var i = 0; i < stops.length; i++) {
-          var start = i === 0 ? 0 : (values[i - 1] + values[i]) / 2
-          var end = i === stops.length - 1 ? 255 : (values[i] + values[i + 1]) / 2
-          var left = Math.round(start / 255 * width)
-          var right = Math.round(end / 255 * width)
-          if (right <= left) continue
-          ctx.fillStyle = stops[i]
-          ctx.fillRect(left, 0, right - left, height)
+        var families = RadarModel.radarLegendFamilies()
+        if (families.length === 0) return
+        var share = width / families.length
+        for (var f = 0; f < families.length; f++) {
+          var stops = families[f].stops
+          var cell = share / stops.length
+          for (var i = 0; i < stops.length; i++) {
+            ctx.fillStyle = stops[i]
+            ctx.fillRect(Math.round(f * share + i * cell), 0, Math.ceil(cell) + 1, height)
+          }
         }
       } else {
         var rows = root.airRows

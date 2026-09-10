@@ -76,6 +76,18 @@ test("radar rendering is disabled when an air category owns the map", () => {
   assert.match(tileLayer, /model: root\.active \? root\.tiles : \[\]/)
 })
 
+test("a chip change is acted on after the mode bindings settle", () => {
+  const panel = read("Panel.qml")
+
+  // QML runs onActiveCategoryChanged while `radarMode` and `activeLayer`,
+  // bindings over `activeCategory`, still hold the previous chip. A
+  // synchronous sync would take the wrong branch on the way back to Radar —
+  // clearing the radar frames instead of staging one and leaving the air
+  // overlay up — so the handler must defer to the end of the turn.
+  assert.match(panel,
+    /onActiveCategoryChanged:\s*Qt\.callLater\(function\(\)\s*\{[\s\S]*?syncAirOverlay\(\)[\s\S]*?syncRadarOverlay\(\)/)
+})
+
 test("the legend is a strip docked under the map at the map's width", () => {
   const panel = read("Panel.qml")
   const legend = read(join("ui", "LegendStrip.qml"))
@@ -85,10 +97,16 @@ test("the legend is a strip docked under the map at the map's width", () => {
   // which keeps its own one-line reading.
   assert.match(panel, /LegendStrip \{\s*\n\s*width: parent\.width/)
   assert.match(panel, /mode: root\.shownAirLayerName !== "" \? root\.activeCategory : "radar"/)
-  assert.match(panel, /schemeName: RadarModel\.colorSchemeName\(root\.colorSchemeId\)/)
   assert.match(panel, /layerLabel: root\.activeLayer \? CamsModel\.layerLabel/)
   assert.match(legend, /textFormat\s*:\s*Text\.PlainText/)
   assert.match(legend, /Color\.popups\.background/)
+  // The radar ramp is one palette whichever scheme is requested, so the legend
+  // names it "Radar" and carries no scheme name.
+  assert.doesNotMatch(legend, /schemeName/)
+  assert.doesNotMatch(panel, /schemeName: RadarModel\.colorSchemeName/)
+  // The radar ramp is keyed by colour family, not laid out by alpha value.
+  assert.match(legend, /RadarModel\.radarLegendFamilies\(\)/)
+  assert.doesNotMatch(legend, /RadarModel\.radarLegendBands\(\)/)
 })
 
 // Strings that leave this plugin for components it does not own. Notification
