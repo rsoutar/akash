@@ -94,16 +94,14 @@ Panel {
   readonly property int defaultZoomSetting: Settings.defaultZoom(settings)
   readonly property bool showLabelInBar: Settings.showLabel(settings)
   readonly property var viewOptions: Settings.VIEW_OPTIONS
-  readonly property var schemeOptions: RadarModel.COLOR_SCHEMES.map(function(s) { return s.name })
   readonly property color settingsForeground: root.bar ? root.bar.foreground : Color.foreground
 
-  // A field owns the keys while it is focused — otherwise typing "s" to pick
-  // a colour would toggle the page shut in the middle of the edit. The
-  // location picker and the first-run prompt own them the same way.
+  // A field owns the keys while it is focused — otherwise typing "s" to toggle
+  // the page would fire in the middle of an edit. The location picker and the
+  // first-run prompt own them the same way.
   readonly property bool settingsHasFocus: root.settingsOpen && (
     (locationPicker && locationPicker.fieldFocused)
     || (settingsViewField && (settingsViewField.activeFocus || settingsViewField.popupOpen))
-    || (settingsSchemeField && (settingsSchemeField.activeFocus || settingsSchemeField.popupOpen))
     || (settingsZoomField && settingsZoomField.activeFocus))
 
   function toggleSettings() {
@@ -1246,31 +1244,6 @@ Panel {
 
                   Text {
                     textFormat: Text.PlainText
-                    text: "COLOUR SCHEME"
-                    color: Qt.darker(root.settingsForeground, 1.4)
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.caption
-                    font.letterSpacing: 1
-                  }
-
-                  Dropdown {
-                    id: settingsSchemeField
-                    width: parent.width
-                    value: RadarModel.colorSchemeName(root.colorSchemeId)
-                    options: root.schemeOptions
-                    foreground: root.settingsForeground
-                    fontFamily: Style.font.family
-                    showLabel: false
-                    onChanged: function(v) { root.persistSetting("colorScheme", v) }
-                  }
-                }
-
-                Column {
-                  width: parent.width / 2 - Style.space(6)
-                  spacing: Style.space(4)
-
-                  Text {
-                    textFormat: Text.PlainText
                     text: "DEFAULT ZOOM"
                     color: Qt.darker(root.settingsForeground, 1.4)
                     font.family: Style.font.family
@@ -1293,36 +1266,43 @@ Panel {
                 }
               }
 
-              Row {
+              Column {
                 width: parent.width - parent.leftPadding - parent.rightPadding
                 spacing: Style.space(10)
 
-                // Three equal cells, "the row owns the click" rows in the kit
-                // idiom: the label is the setting, the switch rides its far edge.
+                // Full-width rows rather than a 3-across squeeze: at the
+                // panel's width a third shares ~85px of label space, which
+                // elides "Distinguish snow" into "Distinguish…". The kit's
+                // Toggle idiom is title + description left, switch right.
                 Toggle {
-                  width: (parent.width - Style.space(20)) / 3
+                  width: parent.width
                   label: "Smooth radar"
+                  description: "Blend the radar image instead of hard pixel edges."
                   foreground: root.settingsForeground
                   accent: Color.accent
+                  fontFamily: Style.font.family
                   checked: root.smoothTiles
                   onClicked: root.persistSetting("smoothTiles", !root.smoothTiles)
                 }
 
                 Toggle {
-                  width: (parent.width - Style.space(20)) / 3
+                  width: parent.width
                   label: "Distinguish snow"
+                  description: "Colour snow separately from rain."
                   foreground: root.settingsForeground
                   accent: Color.accent
+                  fontFamily: Style.font.family
                   checked: root.showSnow
                   onClicked: root.persistSetting("showSnow", !root.showSnow)
                 }
 
                 Toggle {
-                  width: (parent.width - Style.space(20)) / 3
+                  width: parent.width
                   label: "Status text"
-                  description: "outlook beside the bar icon"
+                  description: "Print the outlook beside the bar icon (needs storm alerts)."
                   foreground: root.settingsForeground
                   accent: Color.accent
+                  fontFamily: Style.font.family
                   checked: root.showLabelInBar
                   onClicked: root.persistSetting("showLabel", !root.showLabelInBar)
                 }
