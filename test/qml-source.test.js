@@ -109,6 +109,34 @@ test("the legend is a strip docked under the map at the map's width", () => {
   assert.doesNotMatch(legend, /RadarModel\.radarLegendBands\(\)/)
 })
 
+// RainViewer returns the same tiles for every scheme id (see
+// RADAR_GRADIENT_STOPS in lib/RadarModel.js), so a scheme dropdown would be
+// a control with no visible effect. The colour scheme is not offered or named
+// on the settings page at all.
+test("the colour-scheme picker is not offered", () => {
+  const panel = read("Panel.qml")
+
+  assert.doesNotMatch(panel, /settingsSchemeField\b/)
+  assert.doesNotMatch(panel, /persistSetting\("colorScheme"/)
+  assert.doesNotMatch(panel, /COLOUR SCHEME/)
+  assert.doesNotMatch(panel, /RadarModel\.colorSchemeName\(/)
+})
+
+// The three display toggles are full-width rows. Squeezed three-across, each
+// label gets only a third of the panel's width and "Distinguish snow" elides
+// to "Distinguish…"; the kit's Toggle idiom is title + description on the
+// left and the switch on the right, which reads at any width.
+test("the display toggles are full-width rows with descriptions", () => {
+  const panel = read("Panel.qml")
+
+  assert.doesNotMatch(panel, /\(parent\.width - Style\.space\(20\)\) \/ 3/)
+  for (const label of ["Smooth radar", "Distinguish snow", "Status text"]) {
+    const block = panel.slice(panel.indexOf(label) - 200, panel.indexOf(label) + 400)
+    assert.match(block, /Toggle \{\s*\n\s*width: parent\.width/, label)
+    assert.match(block, /description:/, label)
+  }
+})
+
 // Strings that leave this plugin for components it does not own. Notification
 // bodies are rendered by Omarchy's notification stack, which cannot be pinned
 // to PlainText and whose body field is markup-capable.
