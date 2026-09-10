@@ -69,19 +69,22 @@ Item {
   property bool alertsEnabled: false
   property int alertRadiusKm: 100
 
-  // Shown until the first frame list arrives, so an empty map during the
-  // first second does not read as "no rain".
-  property bool loading: false
-
   // Whether the frame list is absent because fetching it failed rather than
-  // because it has not arrived yet. An empty map that says it is loading, for
-  // as long as the network is down, is the wrong half of that.
+  // because it has not arrived yet. The header reads "Fetching" while the list
+  // is on its way and must stop once the fetch is known to have failed rather
+  // than blink forever, which is what this tells the panel.
   //
   // Only the list. Whether the tiles under it can be fetched is deliberately
   // not reported: the layers cache by URL, so a map holding frames it
   // fetched before goes on drawing them with no network at all — correctly,
   // and with the frame's own time under it.
   property bool overlayUnavailable: false
+
+  // Whether the map is pulling *new* data. Only the CAMS overlay: radar tiles
+  // are cached by URL and merely re-decode when a chip returns to Radar, which
+  // is not a fetch and would otherwise blink the header every time. The
+  // overlay is a fresh GetMap per viewport and step, so it is a real request.
+  readonly property bool fetching: airLayer.loading
 
   property string attribution: ""
 
@@ -161,6 +164,7 @@ Item {
     // per forecast step, hidden while the view moves under it. See
     // ui/AirLayer.qml for why it is a GetMap image rather than tiles.
     AirLayer {
+      id: airLayer
       anchors.fill: parent
       active: root.airOverlayVisible
       centerLatitude: root.centerLatitude
@@ -310,11 +314,13 @@ Item {
       opacity: 0.4
     }
 
+    // The failure state only. "Loading radar…" is the header's "Fetching" now;
+    // an empty map in a radar-free region still says so on the map itself.
     Text {
       textFormat: Text.PlainText
       anchors.centerIn: parent
-      visible: root.loading
-      text: root.overlayUnavailable ? "Radar unavailable" : "Loading radar…"
+      visible: root.overlayUnavailable
+      text: "Radar unavailable"
       color: root.foreground
       font.family: Style.font.family
       font.pixelSize: Style.font.body

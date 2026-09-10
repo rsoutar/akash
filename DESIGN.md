@@ -26,11 +26,23 @@ either table is shown with a capture, not described.
 Show actual frame and timeline times. The timeline stamp shows the frame's
 own clock (`ui/Timeline.qml`), plus "35 min ago" when a radar frame sits
 behind the newest. An empty map is ambiguous, so the plugin says which it is:
-"Loading radar…" while frames are on their way, "Radar unavailable" when
-fetching them failed, and "· no radar coverage" where the coverage probe found
-no ground radar. A clear sky is a real radar image that shows nothing falling;
-an empty map in a radar-free part of the world means "nothing is known", not
-"nothing is falling".
+the header's "Fetching" while frames are on their way, "Radar unavailable" on
+the map when fetching them failed, and "· no radar coverage" where the
+coverage probe found no ground radar. A clear sky is a real radar image that
+shows nothing falling; an empty map in a radar-free part of the world means
+"nothing is known", not "nothing is falling".
+
+The panel's top line (`ui/PanelHeader.qml`) carries the plugin's name and its
+live state: a terminal-style blinking dot, green and reading "Live" when idle,
+orange and reading "Fetching" while any request is in flight. The green and
+orange are fixed literals because the theme palette exposes no such roles; the
+name and label stay on the theme's foreground. This is the panel's only status
+readout — the map does not repeat it. "Fetching" tracks real requests — the
+service's polls, a location save, and the CAMS overlay's GetMap — not radar
+tile rendering: those tiles are cached by URL and merely re-decode when a chip
+returns to Radar, so counting them would blink the header on every switch.
+Work that finishes inside half a second is ignored too, so a fast request does
+not flash the label.
 
 Keep attribution: data credits (RainViewer, Open-Meteo, Copernicus
 CAMS/ECMWF, Natural Earth) in README's data-sources section, and code credits

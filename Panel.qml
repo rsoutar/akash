@@ -824,6 +824,45 @@ Panel {
 
   readonly property bool coverageMissing: service ? (service.coverageChecked && !service.hasCoverage) : false
 
+  // Whether any work is in flight right now: the service's polls, the map's
+  // tiles and CAMS overlay, or a location being saved. The initial empty map
+  // counts too, but only until fetching it is known to have failed, so an
+  // outage does not blink "Fetching" forever.
+  //
+  // Deliberately not what the header renders. Switching a chip back to Radar
+  // re-reads tiles from Qt's pixmap cache, which still counts here while the
+  // images decode — so the raw signal flickers for work that cost no network.
+  readonly property bool fetchingBusy: {
+    if (root.savingLocation) return true
+    if (root.service && root.service.fetching) return true
+    if (map.fetching) return true
+    if (root.frames.length === 0 && !(root.service && root.service.frameFailures > 0)) return true
+    return false
+  }
+
+  // What the header shows: "Fetching" only once the work has outlived a cache
+  // read. A cached decode settles well inside this window, so chip switches do
+  // not blink the header; a request that really has to travel still does.
+  readonly property int fetchingSettleMs: 500
+  property bool fetching: false
+
+  Timer {
+    id: fetchingSettle
+    interval: root.fetchingSettleMs
+    onTriggered: root.fetching = true
+  }
+
+  onFetchingBusyChanged: {
+    if (root.fetchingBusy) {
+      if (!root.fetching) fetchingSettle.restart()
+    } else {
+      fetchingSettle.stop()
+      root.fetching = false
+    }
+  }
+
+  Component.onCompleted: if (root.fetchingBusy) fetchingSettle.start()
+
   KeyboardPanel {
     id: panel
     anchorItem: root.anchorItem
@@ -871,6 +910,12 @@ Panel {
         width: parent.width
         spacing: Style.space(10)
 
+        PanelHeader {
+          width: parent.width
+          foreground: root.bar ? root.bar.foreground : Color.foreground
+          fetching: root.fetching
+        }
+
         MapCanvas {
           id: map
           width: parent.width
@@ -900,7 +945,6 @@ Panel {
           alertsEnabled: root.alertsEnabled
           alertRadiusKm: root.alertRadiusKm
 
-          loading: root.frames.length === 0
           overlayUnavailable: root.service ? root.service.frameFailures > 0 : false
           attribution: root.attribution
 

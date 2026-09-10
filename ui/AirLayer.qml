@@ -1,5 +1,4 @@
 import QtQuick
-import qs.Commons
 import "../lib/CamsModel.js" as CamsModel
 
 // One WMS GetMap overlay for the exact viewport, double-buffered.
@@ -50,9 +49,13 @@ Item {
 
   function rebuildOverlay() {
     if (!active || !layerName) { clearBuffers(); return }
+    // Hidden: there is no viewport to fit, and holding a pending marker would
+    // keep the panel header saying "Fetching" for a map nobody can see. The
+    // layer refetches for the live viewport when it next becomes visible.
+    if (!visible) { clearBuffers(); return }
     // Not laid out yet (panel still opening): retry rather than clear, so the
     // overlay heals itself once the viewport has a real size.
-    if (!visible || !laidOut) { scheduleRebuild(); return }
+    if (!laidOut) { scheduleRebuild(); return }
     var bbox = CamsModel.viewportBbox(centerLatitude, centerLongitude, zoom, width, height)
     applyOverlay(CamsModel.mapUrl(layerName, layerStyle, bbox, width, height, stepTime))
   }
@@ -135,51 +138,16 @@ Item {
     }
   }
 
-  // Small proof the layer is working, not silently stalling.
-  Rectangle {
-    visible: root.loading && root.active
-    anchors.horizontalCenter: parent.horizontalCenter
-    anchors.top: parent.top
-    anchors.topMargin: Style.space(8)
-    radius: Style.cornerRadius
-    color: Color.popups.background
-    border.width: 1
-    border.color: root.bar ? root.bar.foreground : Color.foreground
-    opacity: 0.85
-    implicitWidth: loadingRow.implicitWidth + Style.space(16)
-    implicitHeight: loadingRow.implicitHeight + Style.space(8)
+  // The same guard for the overlay: a GetMap request that never answers would
+  // otherwise leave `pendingBuffer` set — and the panel header reading
+  // "Fetching" — until the layer changes. Give up after this long; the next
+  // viewport or step change asks again.
+  readonly property int loadStallMs: 8000
 
-    Row {
-      id: loadingRow
-      anchors.centerIn: parent
-      spacing: Style.space(6)
-
-      Text {
-        textFormat: Text.PlainText
-        anchors.verticalCenter: parent.verticalCenter
-        text: "↻"
-        color: root.bar ? root.bar.foreground : Color.foreground
-        font.family: Style.font.family
-        font.pixelSize: Style.font.caption
-
-        RotationAnimator on rotation {
-          running: root.loading
-          from: 0
-          to: 360
-          duration: 900
-          loops: Animation.Infinite
-        }
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        anchors.verticalCenter: parent.verticalCenter
-        text: "Updating…"
-        color: root.bar ? root.bar.foreground : Color.foreground
-        font.family: Style.font.family
-        font.pixelSize: Style.font.caption
-      }
-    }
+  Timer {
+    interval: root.loadStallMs
+    running: root.pendingBuffer !== -1
+    onTriggered: if (root.pendingBuffer !== -1) root.bufferFailed(root.pendingBuffer)
   }
 
   Timer {
