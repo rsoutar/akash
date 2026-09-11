@@ -85,76 +85,99 @@ Item {
   implicitWidth: root.pad * 2 + Style.space(224)
   implicitHeight: Style.space(52)
 
+  readonly property color ink: root.bar ? root.bar.foreground : Color.foreground
+
   Rectangle {
     anchors.fill: parent
     radius: Style.cornerRadius
     color: Color.popups.background
     border.width: 1
-    border.color: root.bar ? root.bar.foreground : Color.foreground
+    border.color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.25)
     opacity: 0.94
   }
 
   Text {
     anchors.top: parent.top
-    anchors.topMargin: Style.space(4)
+    anchors.topMargin: Style.space(6)
     anchors.left: parent.left
     anchors.leftMargin: root.pad
     textFormat: Text.PlainText
     text: root.title + (root.endTitle !== "" ? " · " + root.endTitle : "")
-    color: root.bar ? root.bar.foreground : Color.foreground
+    color: root.ink
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
     width: root.width - root.pad * 2
   }
 
-  // The ramp itself, painted from the palette the tile renders in. The radar
-  // ramp is keyed by colour family: each family owns an equal third of the bar
-  // and paints its stops across that third, so grey tans no longer crowd the
-  // blues and reds off the end. The one-pixel overlap between cells closes the
-  // hairline seams rounding would otherwise leave.
+  // The ramp itself, painted as a seamless gradient from the palette the tile
+  // renders in. The radar ramp is keyed by colour family across equal thirds,
+  // blending smoothly without seams.
   Canvas {
     id: ramp
-    x: root.pad
-    y: Style.space(17)
-    width: root.width - root.pad * 2
+    anchors.left: parent.left
+    anchors.leftMargin: root.pad
+    anchors.right: parent.right
+    anchors.rightMargin: root.pad
+    anchors.verticalCenter: parent.verticalCenter
     height: root.barHeight
     renderTarget: Canvas.FramebufferObject
 
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
 
+    Connections {
+      target: root
+      function onModeChanged() { ramp.requestPaint() }
+    }
+
     onPaint: {
       var ctx = getContext("2d")
       ctx.reset()
       if (width <= 0 || height <= 0) return
 
+      var r = Math.min(height / 2, Style.space(3))
+      ctx.beginPath()
+      ctx.moveTo(r, 0)
+      ctx.lineTo(width - r, 0)
+      ctx.arcTo(width, 0, width, r, r)
+      ctx.arcTo(width, height, width - r, height, r)
+      ctx.lineTo(r, height)
+      ctx.arcTo(0, height, 0, height - r, r)
+      ctx.arcTo(0, 0, r, 0, r)
+      ctx.closePath()
+      ctx.clip()
+
       if (root.mode === "radar") {
         var families = RadarModel.radarLegendFamilies()
         if (families.length === 0) return
-        var share = width / families.length
+        var grad = ctx.createLinearGradient(0, 0, width, 0)
         for (var f = 0; f < families.length; f++) {
           var stops = families[f].stops
-          var cell = share / stops.length
-          for (var i = 0; i < stops.length; i++) {
-            ctx.fillStyle = stops[i]
-            ctx.fillRect(Math.round(f * share + i * cell), 0, Math.ceil(cell) + 1, height)
+          var n = stops.length
+          for (var i = 0; i < n; i++) {
+            var frac = (f + (i + 0.5) / n) / families.length
+            if (f === 0 && i === 0) grad.addColorStop(0.0, stops[i])
+            grad.addColorStop(Math.min(1.0, Math.max(0.0, frac)), stops[i])
+            if (f === families.length - 1 && i === n - 1) grad.addColorStop(1.0, stops[i])
           }
         }
+        ctx.fillStyle = grad
+        ctx.fillRect(0, 0, width, height)
       } else {
         var rows = root.airRows
         if (rows.length === 0) return
-        var gap = 2
-        var cell = (width - gap * (rows.length - 1)) / rows.length
+        var grad = ctx.createLinearGradient(0, 0, width, 0)
         for (var j = 0; j < rows.length; j++) {
-          ctx.fillStyle = rows[j].color
-          ctx.fillRect(Math.round(j * (cell + gap)), 0, Math.ceil(cell), height)
+          grad.addColorStop(j / Math.max(1, rows.length - 1), rows[j].color)
         }
+        ctx.fillStyle = grad
+        ctx.fillRect(0, 0, width, height)
       }
     }
   }
 
-  // The band names, each centred on the length of bar that it names.
+  // The band names, each centred on the length of bar that it names, at the bottom.
   Repeater {
     model: root.tiers
 
@@ -162,13 +185,13 @@ Item {
       required property var modelData
       textFormat: Text.PlainText
       text: modelData.name
-      color: root.bar ? root.bar.foreground : Color.foreground
+      color: root.ink
       font.family: Style.font.family
       font.pixelSize: Style.font.caption * 0.92
       anchors.horizontalCenter: parent.left
       anchors.horizontalCenterOffset: root.pad + modelData.fraction * root.stripSpan
-      anchors.top: parent.top
-      anchors.topMargin: Style.space(20)
+      anchors.bottom: parent.bottom
+      anchors.bottomMargin: Style.space(6)
     }
   }
 }
