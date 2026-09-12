@@ -389,35 +389,18 @@ Panel {
     return { time: Date.parse(iso) / 1000, iso: iso }
   })
 
+  // The forecast has no replay: the overlay always serves the step nearest
+  // now, and re-centres on it whenever the layer or its list changes.
   property int camsFrameIndex: 0
-  property real camsShownTime: 0
-  property bool camsFollowingLatest: true
-
-  // Same survival rule as the radar frames: remember the moment, not the
-  // index, because the list is replaced whenever the layer or its dimension
-  // changes.
-  function recordCamsStep() {
-    var frame = camsFrames.length ? camsFrames[Frames.clampIndex(camsFrames, camsFrameIndex)] : null
-    camsShownTime = frame ? frame.time : 0
-    camsFollowingLatest = Frames.isLatest(camsFrames, camsFrameIndex)
-  }
 
   onCamsFramesChanged: {
     if (camsFrames.length === 0) return
-    var next = Frames.reselect(camsFrames, camsShownTime, camsFollowingLatest)
+    var next = CamsModel.nearestTimeIndex(activeStepTimes)
     if (next !== camsFrameIndex) camsFrameIndex = next
-    else { showCamsFrame(camsFrameIndex); recordCamsStep() }
-  }
-
-  function showCamsFrame(index) {
-    if (index < 0 || camsFrames.length === 0) return
     syncAirOverlay()
   }
 
-  onCamsFrameIndexChanged: {
-    showCamsFrame(camsFrameIndex)
-    recordCamsStep()
-  }
+  onCamsFrameIndexChanged: syncAirOverlay()
 
   // A newly chosen layer opens on ~now, not on the analysis time.
   onActiveLayerChanged: {
@@ -427,8 +410,13 @@ Panel {
   }
 
   // ---------------------------------------------------------------------------
-  // Unified timeline
+  // Timeline
   // ---------------------------------------------------------------------------
+  //
+  // The scrubber/play loop belongs to the radar: past frames get replayed, a
+  // CAMS forecast is a single latest step with no transport of its own. The
+  // shared properties below keep the kit's Timeline generic over either model
+  // while only the radar ever feeds it.
 
   readonly property var timelineFrames: radarMode ? frames : camsFrames
   readonly property int timelineIndex: radarMode ? frameIndex : camsFrameIndex
@@ -446,13 +434,10 @@ Panel {
     ? isLatestFrame : Frames.isLatest(camsFrames, camsFrameIndex)
 
   function setTimelineIndex(index) {
+    // Only the radar loop replays; a CAMS forecast always shows latest.
+    if (!radarMode) return
     playing = false
-    if (radarMode) frameIndex = index
-    else camsFrameIndex = index
-  }
-
-  function setTimelinePlaying(next) {
-    playing = next
+    frameIndex = index
   }
 
   // ---------------------------------------------------------------------------
@@ -759,22 +744,18 @@ Panel {
 
   Timer {
     id: playbackTimer
-    // Radar: slow enough to read the motion rather than watch a strobe, with
-    // a longer hold on the newest frame — and slow enough that the tile decode
-    // of the next frame usually finishes before the clock asks for it. When it
-    // does not, the tick below waits: advancing past a frame still loading
+    // Slow enough to read the motion rather than watch a strobe, with a
+    // longer hold on the newest frame — and slow enough that the tile decode
+    // of the next frame usually finishes before the clock asks for it. When
+    // it does not, the tick below waits: advancing past a frame still loading
     // would abandon it and start another wait, and the loop would stutter
-    // rather than breathe. CAMS: steps are hourly, so a steady pace; the
-    // overlay's double buffer absorbs frames that load slower than the clock.
-    interval: radarMode ? (isLatestFrame ? 2000 : 850) : 1200
+    // rather than breathe.
+    interval: isLatestFrame ? 2000 : 850
     repeat: true
-    running: root.playing && root.opened && timelineFrames.length > 1
+    running: root.playing && root.opened && root.radarMode && frames.length > 1
     onTriggered: {
-      if (radarMode) {
-        if (root.swapPending) return
-        root.frameIndex = Frames.nextIndex(frames, root.frameIndex)
-      }
-      else root.camsFrameIndex = Frames.nextIndex(camsFrames, root.camsFrameIndex)
+      if (root.swapPending) return
+      root.frameIndex = Frames.nextIndex(frames, root.frameIndex)
     }
   }
 
@@ -994,16 +975,16 @@ Panel {
       blocked: root.editingLocation || root.settingsHasFocus || root.locationPromptOpen
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
-      onReturnRequested: root.playing = !root.playing
+      onReturnRequested: if (root.radarMode) root.playing = !root.playing
 
       Keys.onPressed: function(event) {
         if (event.text === "s" || event.text === "S") {
           root.toggleSettings()
           event.accepted = true
-        } else if (event.key === Qt.Key_Left) {
+        } else if (event.key === Qt.Key_Left && root.radarMode) {
           root.setTimelineIndex(Math.max(0, root.timelineIndex - 1))
           event.accepted = true
-        } else if (event.key === Qt.Key_Right) {
+        } else if (event.key === Qt.Key_Right && root.radarMode) {
           root.setTimelineIndex(Math.min(root.timelineFrames.length - 1, root.timelineIndex + 1))
           event.accepted = true
         } else if (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal) {
@@ -1157,13 +1138,17 @@ Panel {
           Timeline {
             width: parent.width
             bar: root.bar
+            replayable: root.radarMode
             frames: root.timelineFrames
             frameIndex: root.timelineIndex
             playing: root.playing
             frameLabel: root.timelineLabel
             frameAgo: root.timelineAgo
             isLatestFrame: root.timelineAtLatest
-            labelWidth: Style.space(96)
+            // The stamp box reserve pins the slider's anchor chain. The
+            // widest line is the "ago" caption ("1 h 55 m ago", ~56px at its
+            // 8.5px size), so 72px fits with slack.
+            labelWidth: Style.space(72)
             onPlayToggled: root.playing = !root.playing
             onFrameRequested: function(index) { root.setTimelineIndex(index) }
           }

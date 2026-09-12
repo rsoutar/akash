@@ -74,15 +74,17 @@ The base map needs nothing at all: it ships with the plugin as
 | --- | --- |
 | Drag | pan |
 | Wheel, `+` / `-` | zoom towards the pointer |
-| Play button, `Enter` | play the timeline |
-| `←` / `→` | step one frame |
+| Play button, `Enter` | play the radar loop |
+| `←` / `→` | step the radar loop one frame |
 | Crosshair button, `Home` | recentre on your location |
 | `Tab` | move to the neighbouring bar panel |
 | `Esc` | close |
 
 The panel opens on your location and on the newest moment, every time —
-radar on top of the air-quality layers you have enabled, one scrubber under
-the map for both. Which view it opens on is a setting: **Open panel on** in
+radar on top of the air-quality layers you have enabled, a scrubbing
+timeline under the map for the radar loop. Air-quality layers have no
+timeline: each shows the forecast step nearest now. Which view it opens on
+is a setting: **Open panel on** in
 the widget's settings, Radar by default, or your last-used chip. While the
 panel is open a new frame list arriving every ten minutes does not move you;
 once you close it, the map asks for nothing.
