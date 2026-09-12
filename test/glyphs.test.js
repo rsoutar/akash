@@ -11,7 +11,7 @@ const Glyphs = loadLibrary("Glyphs.js")
 // font contains a glyph at that position either way, so a coverage check
 // confirms nothing. These were resolved by name rather than assumed.
 const REGISTRY = {
-  RADAR: [0xF0437, "md-radar"],
+  RADAR: [0xF054A, "md-umbrella"],
   PLAY: [0xF040A, "md-play"],
   PAUSE: [0xF03E4, "md-pause"],
   PENCIL: [0xF03EB, "md-pencil"],
