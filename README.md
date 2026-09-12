@@ -152,6 +152,17 @@ In a large city, name your neighbourhood rather than the city — the picker
 resolves Tatuapé, Vila Mariana and the rest, and separates them from their
 namesakes elsewhere.
 
+For the sharpest answer, set your exact position instead: edit the location
+and switch **SET BY** to **GPS coordinates**. Enter what the header should
+show (e.g. "Home"), plus the latitude and longitude of your building, and
+Save. The pair is written to the same shared file through the same
+`omarchy-weather-location` call as any city — the radar centres on it, the
+forecast is sampled around it, and the alert radius and air-quality reading
+follow — so in a city where downtown and where you live are a few
+kilometres apart, the rain that reaches you is the rain you are told about.
+The stock weather widget accepts the same coordinates; only the name shown
+in its header changes (wttr.in still answers for the exact point).
+
 ## Alerts
 
 Alerts are **off by default**, both of them. Turn them on from their switches

@@ -457,6 +457,13 @@ Panel {
   property string geocodePendingQuery: ""
   property string geocodeActiveQuery: ""
 
+  // Which picker mode the edit session is in — the city search or exact GPS
+  // coordinates — and why a coordinate commit was refused. The coordinate
+  // fields themselves are read and seeded through `locationPicker` aliases,
+  // like the search field, so the panel never binds to live text.
+  property string locationEditMode: "city"
+  property string coordinateError: ""
+
   function startEditingLocation() {
     if (editingLocation) return
     editingLocation = true
@@ -466,6 +473,14 @@ Panel {
     locationSuggestions = []
     suggestionIndex = 0
     locationPicker.query = root.locationName
+    // The exact-GPS fields are seeded with what is actually stored, whether
+    // it came from a geocoded city or from a typed pair, so switching modes
+    // shows the current point rather than a blank form.
+    root.locationEditMode = "city"
+    root.coordinateError = ""
+    locationPicker.coordinateName = root.locationName
+    locationPicker.coordinateLatitude = root.hasLocation ? String(root.service.location.latitude) : ""
+    locationPicker.coordinateLongitude = root.hasLocation ? String(root.service.location.longitude) : ""
     Qt.callLater(function() { locationPicker.focusQuery() })
   }
 
@@ -475,7 +490,38 @@ Panel {
     locationSuggestions = []
     suggestionIndex = 0
     geocodePendingQuery = ""
+    coordinateError = ""
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  // The same coordinate pair reaches the shared weather.json either way: the
+  // geocoder resolves a name to a point, a typed pair names nothing itself,
+  // so the name field and the two numbers are what get saved.
+  function switchLocationEditMode(mode) {
+    root.locationEditMode = mode === "coordinates" ? "coordinates" : "city"
+    root.coordinateError = ""
+    Qt.callLater(function() {
+      if (mode === "coordinates") locationPicker.focusCoordinates()
+      else locationPicker.focusQuery()
+    })
+  }
+
+  function commitCoordinates() {
+    if (root.savingLocation) return
+    var parsed = RadarModel.parseCoordinates(locationPicker.coordinateLatitude,
+      locationPicker.coordinateLongitude)
+    if (!parsed) {
+      root.coordinateError = "Enter a plain latitude (−90 to 90) and longitude (−180 to 180)"
+      return
+    }
+    var name = locationPicker.coordinateName.trim()
+    if (name === "") {
+      root.coordinateError = "Name the location — that is what the header shows"
+      return
+    }
+    root.coordinateError = ""
+    root.savingLocation = true
+    root.persistLocation(name, parsed.latitude, parsed.longitude)
   }
 
   function commitLocation() {
@@ -1322,8 +1368,10 @@ Panel {
                 coverageMissing: root.coverageMissing
                 editing: root.editingLocation
                 saving: root.savingLocation
+                editingMode: root.locationEditMode
                 suggestions: root.locationSuggestions
                 suggestionIndex: root.suggestionIndex
+                coordinateError: root.coordinateError
 
                 onEditRequested: root.startEditingLocation()
                 onCancelRequested: root.cancelEditingLocation()
@@ -1332,6 +1380,8 @@ Panel {
                 onQueryEdited: geocodeDebounce.restart()
                 onSuggestionHighlighted: function(index) { root.suggestionIndex = index }
                 onSuggestionPicked: function(suggestion) { root.pickSuggestion(suggestion) }
+                onModeSwitchRequested: function(mode) { root.switchLocationEditMode(mode) }
+                onCoordinateCommitRequested: root.commitCoordinates()
               }
             }
 

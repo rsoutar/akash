@@ -25,9 +25,25 @@ Column {
   property var suggestions: []
   property int suggestionIndex: 0
 
+  // Which entry the edit session is using: "city" is the geocoding search,
+  // "coordinates" is exact GPS lat/lon. A typed coordinate is not a second
+  // location — it is a sharper version of the same one, stored through the
+  // same shared weather.json.
+  property string editingMode: "city"
+
   // The search text. The panel reads it to commit and writes it to seed the
   // field, so it is exposed rather than mirrored.
   property alias query: locationField.text
+
+  // The coordinate edit's three fields, exposed like `query` so the panel
+  // reads them at commit and seeds them when the edit starts.
+  property alias coordinateName: coordNameField.text
+  property alias coordinateLatitude: coordLatField.text
+  property alias coordinateLongitude: coordLonField.text
+
+  // Why a coordinate commit was refused, shown until the next edit. Empty
+  // (the resting state) shows nothing.
+  property string coordinateError: ""
 
   signal editRequested()
   signal cancelRequested()
@@ -36,15 +52,25 @@ Column {
   signal queryEdited()
   signal suggestionHighlighted(int index)
   signal suggestionPicked(var suggestion)
+  signal modeSwitchRequested(var mode)
+  signal coordinateCommitRequested()
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
 
-  // Whether the search field currently owns the keyboard, so a parent can
-  // hang its key-catcher temporarily.
+  // Whether any edit field currently owns the keyboard, so a parent can hang
+  // its key-catcher temporarily — typing "s" in the middle of a latitude must
+  // edit, not close the settings page.
   readonly property bool fieldFocused: locationField.activeFocus
+    || coordNameField.activeFocus || coordLatField.activeFocus || coordLonField.activeFocus
 
   function focusQuery() {
     locationField.forceActiveFocus()
+  }
+
+  // The same for the coordinate fields, which the panel calls after a mode
+  // switch so the session picks up on the name rather than a hidden field.
+  function focusCoordinates() {
+    coordNameField.forceActiveFocus()
   }
 
   Item {
@@ -123,7 +149,7 @@ Column {
     }
 
     Row {
-      visible: root.editing
+      visible: root.editing && root.editingMode !== "coordinates"
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(6)
@@ -194,12 +220,179 @@ Column {
         }
       }
     }
+
+    // Exact GPS coordinates: a name (what the header shows) plus a lat/lon
+    // pair, entered as text. The panel validates on commit and refuses with a
+    // reason rather than saving a point on the wrong street.
+    Row {
+      visible: root.editing && root.editingMode === "coordinates"
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: Style.space(6)
+
+      TextField {
+        id: coordNameField
+        width: Style.space(140)
+        enabled: !root.saving
+        placeholderText: "Name"
+        foreground: root.foreground
+        font.family: Style.font.family
+
+        Keys.onPressed: function(event) {
+          if (event.key === Qt.Key_Escape) {
+            root.cancelRequested()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            root.coordinateCommitRequested()
+            event.accepted = true
+          }
+        }
+      }
+
+      TextField {
+        id: coordLatField
+        width: Style.space(92)
+        enabled: !root.saving
+        placeholderText: "Latitude"
+        foreground: root.foreground
+        font.family: Style.font.family
+
+        Keys.onPressed: function(event) {
+          if (event.key === Qt.Key_Escape) {
+            root.cancelRequested()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            root.coordinateCommitRequested()
+            event.accepted = true
+          }
+        }
+      }
+
+      TextField {
+        id: coordLonField
+        width: Style.space(92)
+        enabled: !root.saving
+        placeholderText: "Longitude"
+        foreground: root.foreground
+        font.family: Style.font.family
+
+        Keys.onPressed: function(event) {
+          if (event.key === Qt.Key_Escape) {
+            root.cancelRequested()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            root.coordinateCommitRequested()
+            event.accepted = true
+          }
+        }
+      }
+
+      Button {
+        // A clicked save can land twice before the panel's `savingLocation`
+        // latch is set; the guard in commitCoordinates() is what stops it.
+        text: "Save"
+        fontSize: Style.font.bodySmall
+        fontFamily: Style.font.family
+        foreground: root.foreground
+        accent: Color.accent
+        background: "transparent"
+        bordered: true
+        onClicked: root.coordinateCommitRequested()
+      }
+    }
+  }
+
+  // Which entry the edit is in, offered beside the search so the GPS path is
+  // discoverable rather than hidden behind a setting. The active chip is
+  // filled the way the suggestion rows are; a switch is immediate and the
+  // panel re-focuses the right field.
+  Row {
+    visible: root.editing
+    width: parent.width
+    spacing: Style.space(8)
+
+    Text {
+      textFormat: Text.PlainText
+      anchors.verticalCenter: parent.verticalCenter
+      text: "SET BY"
+      color: Qt.darker(root.foreground, 1.5)
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+    }
+
+    Rectangle {
+      width: cityChipText.implicitWidth + Style.space(14)
+      height: cityChipText.implicitHeight + Style.space(6)
+      radius: Math.min(4, Style.cornerRadius)
+      color: root.editingMode === "city"
+        ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+
+      Text {
+        id: cityChipText
+        textFormat: Text.PlainText
+        anchors.centerIn: parent
+        text: "City"
+        color: root.editingMode === "city"
+          ? Style.hoverStateColor(root.foreground, Color.accent) : root.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.modeSwitchRequested("city")
+      }
+    }
+
+    Rectangle {
+      width: coordChipText.implicitWidth + Style.space(14)
+      height: coordChipText.implicitHeight + Style.space(6)
+      radius: Math.min(4, Style.cornerRadius)
+      color: root.editingMode === "coordinates"
+        ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+
+      Text {
+        id: coordChipText
+        textFormat: Text.PlainText
+        anchors.centerIn: parent
+        text: "GPS coordinates"
+        color: root.editingMode === "coordinates"
+          ? Style.hoverStateColor(root.foreground, Color.accent) : root.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.modeSwitchRequested("coordinates")
+      }
+    }
+  }
+
+  // Why a coordinate commit was refused: the pair is out of range, or it has
+  // no name to show in the header. Its own line so the message never crowds
+  // the chips, styled like the resting warnings and kept close to the fields.
+  Text {
+    textFormat: Text.PlainText
+    width: parent.width
+    visible: root.editingMode === "coordinates" && root.coordinateError !== ""
+    text: root.coordinateError
+    color: Color.urgent
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+    opacity: 0.9
+    wrapMode: Text.WordWrap
   }
 
   Column {
     width: parent.width
     spacing: 0
-    visible: root.editing && !root.saving && root.suggestions.length > 0
+    visible: root.editing && root.editingMode === "city" && !root.saving
+      && root.suggestions.length > 0
 
     Repeater {
       model: root.suggestions
