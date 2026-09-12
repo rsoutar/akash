@@ -44,7 +44,11 @@ name and label stay on the theme's foreground. The configured location sits
 dimmed right of the name (the LOCATION section's resting row shows only its
 warnings now) and clicking either starts the location search; a long saved
 name elides before it reaches the status cluster, so the header is always one
-line. This is the panel's only status readout — the map does not repeat it.
+line. Between the location and the cluster a dim readout says when the newest
+radar frame was published — "just now", "10 min ago" — fed by the service and
+speaking in the timeline's own five-minute blocks; it never bloats the row,
+because the city yields to it exactly as it yields to the cluster. The map
+does not repeat the header's readouts.
 "Fetching" tracks real requests — the
 service's polls, a location save, and the CAMS overlay's GetMap — not radar
 tile rendering: those tiles are cached by URL and merely re-decode when a chip
@@ -125,7 +129,12 @@ service's summary properties; they poll nothing themselves.
 probe, region-from-timezone, and per-endpoint byte ceilings (1 MiB
 capabilities, 4 KiB probe, 64 KiB legend) enforced mid-stream. Every process
 that reads stdout back into the shell process is bounded the same way, and
-`test/streams.test.js` pins each stream and its ceiling.
+`test/streams.test.js` pins each stream and its ceiling. The service points
+its readers at `caps.json` and `state.json` at construction, so a cache left
+by an earlier session renders the layer chips immediately instead of waiting
+on the subprocess — a stale cache is shown until the refresh lands, the same
+policy as the radar frames — while the six-hour refresh still runs once per
+session.
 
 Deliberate preferences live in the widget's shell.json entry, managed by the
 `omarchy` CLI; session restore lives in `~/.config/omarchy/akash/state.json`,

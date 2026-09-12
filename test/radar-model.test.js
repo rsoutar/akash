@@ -432,6 +432,31 @@ test("an age with no frame or no now is not an age at all", () => {
   assert.strictEqual(RadarModel.formatFrameAgo(0, 0), "")
 })
 
+test("the latest-update readout stays populated while the frame is fresh", () => {
+  // The loop caption goes empty under five minutes; a "latest update" label
+  // that blinked away on the freshest frame would hint that nothing was
+  // known. The header's readout answers "just now" instead, then speaks in
+  // the same five-minute blocks as the loop.
+  const now = 1788009000 * 1000
+  const ago = seconds => RadarModel.formatUpdateAge((1788009000 - seconds / 1000 | 0), now)
+
+  assert.strictEqual(ago(0), "just now")
+  assert.strictEqual(ago(4 * 60 * 1000), "just now")
+  assert.strictEqual(ago(5 * 60 * 1000), "5 min ago")
+  assert.strictEqual(ago(10 * 60 * 1000), "10 min ago")
+  assert.strictEqual(ago(33 * 60 * 1000), "35 min ago")
+  assert.strictEqual(ago(2 * 60 * 60 * 1000), "2 h ago")
+  // A frame stamped in the future is the clock moving, not a prediction.
+  assert.strictEqual(ago(-60 * 1000), "just now")
+})
+
+test("a latest-update readout with no frame or no now is empty too", () => {
+  const now = 1788009000 * 1000
+  assert.strictEqual(RadarModel.formatUpdateAge(0, now), "")
+  assert.strictEqual(RadarModel.formatUpdateAge(1788009000, 0), "")
+  assert.strictEqual(RadarModel.formatUpdateAge(0, 0), "")
+})
+
 test("distance is printed with precision that matches its magnitude", () => {
   assert.strictEqual(RadarModel.formatDistance(4.23), "4.2 km")
   assert.strictEqual(RadarModel.formatDistance(42.7), "43 km")
