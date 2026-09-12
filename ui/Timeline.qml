@@ -37,8 +37,12 @@ Item {
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
 
+  // Sources with no replay — a CAMS forecast is shown as its latest step, not
+  // scrubbed — hide the whole transport row. Radar past frames keep it.
+  property bool replayable: true
+
   height: Style.spacing.controlHeight
-  visible: frames.length > 1
+  visible: root.replayable && frames.length > 1
 
   Button {
     id: playButton

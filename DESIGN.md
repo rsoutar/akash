@@ -25,7 +25,11 @@ either table is shown with a capture, not described.
 
 Show actual frame and timeline times. The timeline stamp shows the frame's
 own clock (`ui/Timeline.qml`), plus "35 min ago" when a radar frame sits
-behind the newest. An empty map is ambiguous, so the plugin says which it is:
+behind the newest. Only the radar has a transport: past frames replay
+through the scrubber, while a CAMS forecast is never scrubbed — the air
+overlay always serves the step nearest now, re-centred whenever the layer
+or its forecast list changes. An empty map is ambiguous, so the plugin says
+which it is:
 the header's "Fetching" while frames are on their way, "Radar unavailable" on
 the map when fetching them failed, and "· no radar coverage" where the
 coverage probe found no ground radar. A clear sky is a real radar image that
@@ -96,13 +100,15 @@ writes Omarchy, Hyprland or system configuration outside its own shell.json
 entry.
 
 Refresh, and new frame lists arriving while the panel is open, never move the
-viewport or reset the camera. The timeline remembers the moment the user was
-looking at (`lib/Frames.js`), not the index, and re-places it as the list
-moves underneath. Closing preserves the session: the panel object stays
-mounted, so the chosen zoom, the last-used view and the followed time all
-survive a close. Reopening then starts "about now" — centred on the location,
-on the newest frame — because opening is a question about now; while open,
-scrubbing and panning are never disturbed by an arriving frame list.
+viewport or reset the camera. The radar timeline remembers the moment the
+user was looking at (`lib/Frames.js`), not the index, and re-places it as
+the list moves underneath; a CAMS forecast has no scrub position to keep,
+and simply re-centres on the step nearest now. Closing preserves the
+session: the panel object stays mounted, so the chosen zoom, the last-used
+view and the followed time all survive a close. Reopening then starts
+"about now" — centred on the location, on the newest frame — because opening
+is a question about now; while open, scrubbing and panning are never
+disturbed by an arriving frame list.
 
 ## Split
 
