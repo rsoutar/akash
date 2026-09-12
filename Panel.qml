@@ -1025,6 +1025,7 @@ Panel {
             foreground: root.bar ? root.bar.foreground : Color.foreground
             fetching: root.fetching
             locationName: root.locationName
+            updatedAgo: root.service ? root.service.latestUpdateAge : ""
             onLocationClicked: root.startEditingLocation()
           }
 

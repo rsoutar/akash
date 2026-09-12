@@ -44,7 +44,11 @@ name and label stay on the theme's foreground. The configured location sits
 dimmed right of the name (the LOCATION section's resting row shows only its
 warnings now) and clicking either starts the location search; a long saved
 name elides before it reaches the status cluster, so the header is always one
-line. This is the panel's only status readout — the map does not repeat it.
+line. Between the location and the cluster a dim readout says when the newest
+radar frame was published — "just now", "10 min ago" — fed by the service and
+speaking in the timeline's own five-minute blocks; it never bloats the row,
+because the city yields to it exactly as it yields to the cluster. The map
+does not repeat the header's readouts.
 "Fetching" tracks real requests — the
 service's polls, a location save, and the CAMS overlay's GetMap — not radar
 tile rendering: those tiles are cached by URL and merely re-decode when a chip

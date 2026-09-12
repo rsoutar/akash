@@ -8,6 +8,11 @@ import qs.Commons
 // the panel never goes fully still — green while at rest and orange while a
 // request is in flight. Green and orange are fixed literals rather than theme
 // roles because the palette exposes neither; everything else is themed.
+//
+// Between the location and the state sits how long ago the newest radar
+// picture was published: "just now" or "10 min ago", dimmed like the city and
+// fed by the service. The city elides first, so the readout and the state
+// stay put whatever a long saved name does to the middle of the row.
 Item {
   id: root
 
@@ -18,6 +23,10 @@ Item {
   // The configured location, shown dimmed right of the plugin's name. Empty
   // shows a prompt in its place. Clicking starts the location search.
   property string locationName: ""
+
+  // When the newest radar frame was published, said as an age: "just now",
+  // "10 min ago". Empty (never mind "Live"/locating) shows nothing.
+  property string updatedAgo: ""
 
   signal locationClicked()
 
@@ -85,8 +94,11 @@ Item {
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
         // A long saved name must never shove the status cluster off the
-        // header's right edge, so it ends where the cluster begins.
-        width: Math.max(0, Math.min(implicitWidth, titleRow.width - title.width - root.statusSpace - Style.space(8)))
+        // header's right edge, so it ends where the cluster begins — and
+        // yields to the latest-update readout first, which sits between the
+        // city and the cluster.
+        width: Math.max(0, Math.min(implicitWidth, titleRow.width - title.width - root.statusSpace - Style.space(8)
+          - (updatedAgoText.visible ? updatedAgoText.implicitWidth + Style.space(4) : 0)))
         elide: Text.ElideRight
       }
 
@@ -119,6 +131,24 @@ Item {
         cursorShape: Qt.PointingHandCursor
         onClicked: root.locationClicked()
       }
+    }
+
+    // How long ago the newest radar frame was published, the header's quiet
+    // answer to "is this up to date?": "just now" under five minutes, then
+    // the loop's own five-minute rounding. Hidden, it collapses — a fresh
+    // load, before any manifest, reads as no readout at all rather than a
+    // blank line. Never grows with the city: the city elides first, so this
+    // text and the status cluster keep their places whatever the name does.
+    Text {
+      id: updatedAgoText
+      textFormat: Text.PlainText
+      anchors.verticalCenter: parent.verticalCenter
+      visible: root.updatedAgo !== ""
+      text: root.updatedAgo
+      color: Qt.darker(root.foreground, 1.5)
+      opacity: 0.7
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
     }
   }
 

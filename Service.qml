@@ -165,6 +165,14 @@ Item {
     return frame ? frame.time : 0
   }
 
+  // How long ago the newest radar picture was published, for the header's
+  // "latest update" readout. The nowTick reference is what makes the binding
+  // re-evaluate as time passes; the property would otherwise freeze at the
+  // answer startup computed and grow stale for as long as the manifest sat
+  // still.
+  readonly property string latestUpdateAge: root.latestFrameTime > 0 && root.nowTick >= 0
+    ? RadarModel.formatUpdateAge(root.latestFrameTime, Date.now()) : ""
+
   // Whether the newest frame in hand is one RainViewer could still improve on.
   // Frames publish about every ten minutes, so one younger than that is the
   // newest that exists. A function, not a binding: the answer depends on the
