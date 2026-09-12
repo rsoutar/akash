@@ -334,6 +334,13 @@ Item {
   // the parsed forms. Owned here rather than in the panel for the same reason
   // as the basemap: two monitors share one copy.
   //
+  // The readers point at the files now, not after init: a cache left by an
+  // earlier session renders the chips the moment the service exists, so the
+  // panel opens onto the familiar picker instead of a lone Radar chip that
+  // fills in only when the subprocess happens to be done. watchChanges then
+  // swaps in whatever init refreshes — a stale cache is still the best answer
+  // until the fresh one lands, the same policy as the radar frames.
+  //
   // Read whole, without a ceiling, like the basemap — they are this plugin's
   // own files, inside its own directory. Corruption is handled: an unparseable
   // cache reads as null, and the panel answers with no CAMS categories rather
@@ -344,8 +351,15 @@ Item {
   readonly property string camsRegion: camsState ? String(camsState.region || "europe") : "europe"
   readonly property string camsConfigDir: Quickshell.env("HOME") + "/.config/omarchy/akash"
 
+  // Whether init has been offered this session. `camsReady` is no longer the
+  // gate — the cached files load by themselves — but the six-hour staleness
+  // refresh still has to happen once, so the first acquire decides. Reset on a
+  // process that never forked, so a transient failure can be retried.
+  property bool camsWarmed: false
+
   function ensureCams() {
-    if (camsReady || camsInitProc.running) return
+    if (camsWarmed || camsInitProc.running) return
+    camsWarmed = true
     var script = Qt.resolvedUrl("cams.py").toString().replace("file://", "")
     camsInitProc.launch(["python3", script, "init"])
   }
@@ -355,15 +369,22 @@ Item {
     onResponded: function(exitCode, text) {
       // The files the helper wrote (or left from an earlier session) are the
       // real answer; read them whether or not the refresh itself was clean.
+      // Re-pointing also covers the machine where this directory did not
+      // exist at startup: the creation the helper just made is invisible to a
+      // watch never established, and setting the path re-reads and re-watches.
       camsCapsFile.path = root.camsConfigDir + "/caps.json"
       camsStateFile.path = root.camsConfigDir + "/state.json"
-      if (exitCode !== 0) console.warn("akash: cams.py init failed (" + exitCode + ")")
+      if (exitCode !== 0) {
+        if (exitCode === -1) root.camsWarmed = false
+        console.warn("akash: cams.py init failed (" + exitCode + ")")
+      }
     }
   }
 
   FileView {
     id: camsCapsFile
-    path: ""
+    path: root.camsConfigDir + "/caps.json"
+    watchChanges: true
     onLoaded: {
       try {
         root.camsCaps = JSON.parse(text())
@@ -377,7 +398,8 @@ Item {
 
   FileView {
     id: camsStateFile
-    path: ""
+    path: root.camsConfigDir + "/state.json"
+    watchChanges: true
     onLoaded: {
       try {
         root.camsState = JSON.parse(text())

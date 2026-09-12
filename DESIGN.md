@@ -129,7 +129,12 @@ service's summary properties; they poll nothing themselves.
 probe, region-from-timezone, and per-endpoint byte ceilings (1 MiB
 capabilities, 4 KiB probe, 64 KiB legend) enforced mid-stream. Every process
 that reads stdout back into the shell process is bounded the same way, and
-`test/streams.test.js` pins each stream and its ceiling.
+`test/streams.test.js` pins each stream and its ceiling. The service points
+its readers at `caps.json` and `state.json` at construction, so a cache left
+by an earlier session renders the layer chips immediately instead of waiting
+on the subprocess — a stale cache is shown until the refresh lands, the same
+policy as the radar frames — while the six-hour refresh still runs once per
+session.
 
 Deliberate preferences live in the widget's shell.json entry, managed by the
 `omarchy` CLI; session restore lives in `~/.config/omarchy/akash/state.json`,
