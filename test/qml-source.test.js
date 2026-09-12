@@ -137,6 +137,31 @@ test("the display toggles are full-width rows with descriptions", () => {
   }
 })
 
+// Exact GPS coordinates are a second way into the same weather.json, so the
+// write must stand behind the same validation as a city: an unparsable pair
+// refuses with a reason, and the pair is never handed to the shared CLI until
+// it has passed. Ordering is the whole rule — the check being *after* the
+// persist call would be a comma typed onto the CLI's argv.
+test("a GPS pair is validated before it can reach the shared location", () => {
+  const panel = read("Panel.qml")
+
+  const start = panel.indexOf("function commitCoordinates()")
+  assert.ok(start > 0, "commitCoordinates is missing from Panel.qml")
+  const end = panel.indexOf("function persistLocation(")
+  const commit = panel.slice(start, end)
+
+  assert.match(commit,
+    /RadarModel\.parseCoordinates\(locationPicker\.coordinateLatitude,\s*\n\s*locationPicker\.coordinateLongitude\)/)
+  assert.match(commit, /if \(!parsed\) \{\s*\n\s*root\.coordinateError = /,
+    "an invalid pair shows a reason rather than writing")
+  assert.match(commit, /persistLocation\(name, parsed\.latitude, parsed\.longitude\)/)
+
+  const invalidAt = commit.indexOf("!parsed")
+  const persistAt = commit.indexOf("persistLocation(")
+  assert.ok(invalidAt >= 0 && invalidAt < persistAt,
+    "the pair is checked before it reaches the shared location")
+})
+
 // Strings that leave this plugin for components it does not own. Notification
 // bodies are rendered by Omarchy's notification stack, which cannot be pinned
 // to PlainText and whose body field is markup-capable.

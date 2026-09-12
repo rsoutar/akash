@@ -222,6 +222,54 @@ test("committing free text yields a name with no coordinates", () => {
   assert.strictEqual(RadarModel.locationCommit("   ", [], 0).name, "", "blank commits nothing")
 })
 
+// ------------------------------------------------------------------ coordinates
+
+test("exact GPS coordinates parse from plain decimal text", () => {
+  for (const [lat, lon, expectedLat, expectedLon] of [
+    ["13.75398", "100.50144", 13.75398, 100.50144],
+    ["-23.5505", "-46.6333", -23.5505, -46.6333],
+    ["0", "0", 0, 0],
+    ["-90", "-180", -90, -180],
+    ["  13.7  ", " 100.9", 13.7, 100.9],
+    ["90", "180", 90, 180]
+  ]) {
+    const point = RadarModel.parseCoordinates(lat, lon)
+    assert.notStrictEqual(point, null, `${lat},${lon}`)
+    assert.strictEqual(point.latitude, expectedLat, `${lat},${lon}`)
+    assert.strictEqual(point.longitude, expectedLon, `${lat},${lon}`)
+  }
+})
+
+test("anything that is not a plain lat/lon pair is rejected", () => {
+  // The CLI that stores the pair accepts only an optional sign, digits, and
+  // at most one fractional part — so a value accepted here is one the CLI
+  // will actually store. A comma belongs between the fields, never inside one.
+  for (const [lat, lon] of [
+    ["", "100.5"], ["13.7", ""], [" ", "100.5"],
+    ["abc", "100.5"], ["13.7", "def"],
+    ["13,7", "100.5"], ["13.7", "100,5"],
+    ["1e2", "100.5"], ["13.7", "1e2"],
+    ["13.7.5", "100.5"],
+    ["+13.7", "100.5"],
+    ["13.7", null], [null, "100.5"], [undefined, undefined]
+  ]) {
+    assert.strictEqual(RadarModel.parseCoordinates(lat, lon), null, `${lat},${lon}`)
+  }
+})
+
+test("coordinates outside the globe are rejected", () => {
+  for (const [lat, lon] of [[91, 0], [-91, 0], [0, 181], [0, -181], [-90.1, 0], [0, 180.1]]) {
+    assert.strictEqual(RadarModel.parseCoordinates(String(lat), String(lon)), null,
+      `${lat},${lon}`)
+  }
+})
+
+test("a coordinate pair formats for the shared location CLI", () => {
+  assert.strictEqual(RadarModel.coordinatePair(13.75398, 100.50144), "13.75398,100.50144")
+  assert.strictEqual(RadarModel.coordinatePair(-23.5, -46.6), "-23.5,-46.6")
+  assert.strictEqual(RadarModel.coordinatePair(0, 0), "0,0")
+})
+
 // ------------------------------------------------------------------ sampling
 
 test("the forecast is sampled around the location, not only at it", () => {

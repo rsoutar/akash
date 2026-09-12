@@ -99,9 +99,14 @@ status says "the saved location has no coordinates".
 
 The picker is the stock weather widget's — same geocoding, same
 `omarchy-weather-location` CLI. Choosing a city there writes weather.json
-through that CLI; the watch re-centres the radar live. The plugin never
-writes Omarchy, Hyprland or system configuration outside its own shell.json
-entry.
+through that CLI; the watch re-centres the radar live. The picker also
+accepts exact GPS coordinates as an alternative entry: a name plus a lat/lon
+pair, typed in the picker's coordinates mode, validated against the same
+shape the CLI accepts, and written through the same `--set <name> <lat>,<lon>`
+call. A typed point is not a parallel store — it is the same single
+location, made sharper, and the stock widget continues to work from it as it
+does from a geocoded coordinate. The plugin never writes Omarchy, Hyprland
+or system configuration outside its own shell.json entry.
 
 Refresh, and new frame lists arriving while the panel is open, never move the
 viewport or reset the camera. The radar timeline remembers the moment the
