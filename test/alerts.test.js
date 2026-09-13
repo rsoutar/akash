@@ -356,36 +356,36 @@ test("a garbled number in the series is read as no rain, not as NaN", () => {
 
 test("an alert fires once and then holds", () => {
   let latch = Alerts.CLEAR
-  let decision = Alerts.decideNotification(Alerts.HEAVY, latch, "Heavy", true)
+  let decision = Alerts.decide(Alerts.HEAVY, Alerts.levelValue("Heavy"), latch, true)
   assert.strictEqual(decision.notify, true)
-  latch = decision.notifiedLevel
+  latch = decision.notified
 
   // The same storm, still forecast, ten minutes later.
-  decision = Alerts.decideNotification(Alerts.HEAVY, latch, "Heavy", true)
+  decision = Alerts.decide(Alerts.HEAVY, Alerts.levelValue("Heavy"), latch, true)
   assert.strictEqual(decision.notify, false, "a storm that lingers must not notify eighteen times")
-  assert.strictEqual(decision.notifiedLevel, Alerts.HEAVY, "the latch is kept")
+  assert.strictEqual(decision.notified, Alerts.HEAVY, "the latch is kept")
 })
 
 test("a situation that worsens still escalates", () => {
-  const decision = Alerts.decideNotification(Alerts.SEVERE, Alerts.HEAVY, "Heavy", true)
+  const decision = Alerts.decide(Alerts.SEVERE, Alerts.levelValue("Heavy"), Alerts.HEAVY, true)
   assert.strictEqual(decision.notify, true)
-  assert.strictEqual(decision.notifiedLevel, Alerts.SEVERE)
+  assert.strictEqual(decision.notified, Alerts.SEVERE)
 })
 
 test("the latch clears only once conditions drop under the threshold", () => {
   // Heavy threshold, outlook falls to moderate: below the threshold, so the
   // latch resets and the next heavy reading notifies again.
-  const cleared = Alerts.decideNotification(Alerts.MODERATE, Alerts.HEAVY, "Heavy", true)
+  const cleared = Alerts.decide(Alerts.MODERATE, Alerts.levelValue("Heavy"), Alerts.HEAVY, true)
   assert.strictEqual(cleared.notify, false)
-  assert.strictEqual(cleared.notifiedLevel, Alerts.CLEAR)
+  assert.strictEqual(cleared.notified, Alerts.CLEAR)
 
-  assert.strictEqual(Alerts.decideNotification(Alerts.HEAVY, cleared.notifiedLevel, "Heavy", true).notify, true)
+  assert.strictEqual(Alerts.decide(Alerts.HEAVY, Alerts.levelValue("Heavy"), cleared.notified, true).notify, true)
 })
 
 test("weather under the threshold is never announced", () => {
   for (const [outlook, threshold] of [[Alerts.LIGHT, "Moderate"], [Alerts.MODERATE, "Heavy"],
                                       [Alerts.HEAVY, "Severe"], [Alerts.CLEAR, "Light"]]) {
-    assert.strictEqual(Alerts.decideNotification(outlook, Alerts.CLEAR, threshold, true).notify, false,
+    assert.strictEqual(Alerts.decide(outlook, Alerts.levelValue(threshold), Alerts.CLEAR, true).notify, false,
       `${Alerts.levelName(outlook)} against a ${threshold} threshold`)
   }
 })
@@ -393,9 +393,9 @@ test("weather under the threshold is never announced", () => {
 test("turning alerts off clears the latch as well as silencing it", () => {
   // Otherwise turning them back on during the same storm would stay silent,
   // because the latch would still be holding a level nobody was told about.
-  const decision = Alerts.decideNotification(Alerts.SEVERE, Alerts.HEAVY, "Heavy", false)
+  const decision = Alerts.decide(Alerts.SEVERE, Alerts.levelValue("Heavy"), Alerts.HEAVY, false)
   assert.strictEqual(decision.notify, false)
-  assert.strictEqual(decision.notifiedLevel, Alerts.CLEAR)
+  assert.strictEqual(decision.notified, Alerts.CLEAR)
 })
 
 // ------------------------------------------------------------------ wording

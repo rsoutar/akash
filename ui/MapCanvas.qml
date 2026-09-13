@@ -92,9 +92,7 @@ Item {
   // how opaque. Off entirely when no layer is selected.
   property bool airOverlayVisible: false
   property string airLayerName: ""
-  property string airLayerStyle: ""
   property string airStepTime: ""
-  property real airOpacity: 0.6
 
   signal dragged(real latitude, real longitude)
   signal recenterRequested()
@@ -171,9 +169,7 @@ Item {
       centerLongitude: root.centerLongitude
       zoom: root.zoom
       layerName: root.airLayerName
-      layerStyle: root.airLayerStyle
       stepTime: root.airStepTime
-      overlayOpacity: root.airOpacity
     }
 
     // ---- Alert rings and home marker ------------------------------------

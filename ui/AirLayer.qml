@@ -25,9 +25,7 @@ Item {
   property bool active: false
 
   property string layerName: ""
-  property string layerStyle: ""
   property string stepTime: ""
-  property real overlayOpacity: 0.6
 
   // True while the next frame is on its way — the panel surfaces this.
   property int liveBuffer: -1    // which buffer is shown (-1 = none yet)
@@ -57,7 +55,7 @@ Item {
     // overlay heals itself once the viewport has a real size.
     if (!laidOut) { scheduleRebuild(); return }
     var bbox = CamsModel.viewportBbox(centerLatitude, centerLongitude, zoom, width, height)
-    applyOverlay(CamsModel.mapUrl(layerName, layerStyle, bbox, width, height, stepTime))
+    applyOverlay(CamsModel.mapUrl(layerName, "", bbox, width, height, stepTime))
   }
 
   function applyOverlay(src) {
@@ -88,7 +86,6 @@ Item {
   // folds a drag burst into one request after the movement settles.
   onActiveChanged: scheduleRebuild()
   onLayerNameChanged: scheduleRebuild()
-  onLayerStyleChanged: scheduleRebuild()
   onStepTimeChanged: scheduleRebuild()
   onCenterLatitudeChanged: viewportMoving()
   onCenterLongitudeChanged: viewportMoving()
@@ -115,7 +112,10 @@ Item {
     // reaches this process carries a ceiling; an image served for whatever
     // size the response declares is a stream like any other.
     sourceSize: Qt.size(Math.max(1, root.width), Math.max(1, root.height))
-    opacity: (root.liveBuffer === 0 && root.pendingBuffer === -1) ? root.overlayOpacity : 0
+    // The overlay renders at a fixed 60%: heavy enough to read airborne
+    // distribution through the ground, light enough for the basemap to stay
+    // legible under it. Nothing in the plugin varies it.
+    opacity: (root.liveBuffer === 0 && root.pendingBuffer === -1) ? 0.6 : 0
     Behavior on opacity { NumberAnimation { duration: 150 } }
     onStatusChanged: {
       if (status === Image.Ready) root.bufferReady(0)
@@ -130,7 +130,7 @@ Item {
     cache: true
     fillMode: Image.Stretch
     sourceSize: Qt.size(Math.max(1, root.width), Math.max(1, root.height))
-    opacity: (root.liveBuffer === 1 && root.pendingBuffer === -1) ? root.overlayOpacity : 0
+    opacity: (root.liveBuffer === 1 && root.pendingBuffer === -1) ? 0.6 : 0
     Behavior on opacity { NumberAnimation { duration: 150 } }
     onStatusChanged: {
       if (status === Image.Ready) root.bufferReady(1)

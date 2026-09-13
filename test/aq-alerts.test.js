@@ -9,58 +9,59 @@ const Alerts = loadLibrary("Alerts.js")
 // 0 Good … 5 Extremely poor, -1 no reading.
 
 // ------------------------------------------------------------------- latch
+// decide(current, threshold, notified, enabled)
 
 test("no reading holds the latch rather than re-arming it", () => {
   // A broken probe is not an improvement in the air: dropping the latch here
   // would re-notify from stale data the moment a probe worked again.
-  const decision = Alerts.decideAqNotification(-1, 3, 3, true)
+  const decision = Alerts.decide(-1, 3, 3, true)
   assert.strictEqual(decision.notify, false)
-  assert.strictEqual(decision.notifiedBand, 3)
+  assert.strictEqual(decision.notified, 3)
 })
 
 test("a band under the threshold clears the latch", () => {
-  const decision = Alerts.decideAqNotification(1, 3, 3, true)
+  const decision = Alerts.decide(1, 3, 3, true)
   assert.strictEqual(decision.notify, false)
-  assert.strictEqual(decision.notifiedBand, 0)
+  assert.strictEqual(decision.notified, 0)
 })
 
 test("a band at the threshold notifies once and holds", () => {
-  const first = Alerts.decideAqNotification(3, 0, 3, true)
+  const first = Alerts.decide(3, 3, 0, true)
   assert.strictEqual(first.notify, true)
-  assert.strictEqual(first.notifiedBand, 3)
+  assert.strictEqual(first.notified, 3)
 
   // Same band an hour later: one episode, one notification.
-  const again = Alerts.decideAqNotification(3, first.notifiedBand, 3, true)
+  const again = Alerts.decide(3, 3, first.notified, true)
   assert.strictEqual(again.notify, false)
-  assert.strictEqual(again.notifiedBand, 3)
+  assert.strictEqual(again.notified, 3)
 })
 
 test("a worse band escalates", () => {
-  const decision = Alerts.decideAqNotification(4, 3, 3, true)
+  const decision = Alerts.decide(4, 3, 3, true)
   assert.strictEqual(decision.notify, true)
-  assert.strictEqual(decision.notifiedBand, 4)
+  assert.strictEqual(decision.notified, 4)
 })
 
 test("a better band inside the threshold does not re-notify", () => {
   // Escalation is upward only; improving from Very poor to Poor while the
   // threshold is Poor is the same episode continuing.
-  const decision = Alerts.decideAqNotification(3, 4, 3, true)
+  const decision = Alerts.decide(3, 3, 4, true)
   assert.strictEqual(decision.notify, false)
-  assert.strictEqual(decision.notifiedBand, 4)
+  assert.strictEqual(decision.notified, 4)
 })
 
 test("dropping below the threshold re-arms", () => {
-  const armed = Alerts.decideAqNotification(2, 4, 3, true)
-  assert.strictEqual(armed.notifiedBand, 0)
+  const armed = Alerts.decide(2, 3, 4, true)
+  assert.strictEqual(armed.notified, 0)
 
-  const renotified = Alerts.decideAqNotification(3, armed.notifiedBand, 3, true)
+  const renotified = Alerts.decide(3, 3, armed.notified, true)
   assert.strictEqual(renotified.notify, true)
 })
 
 test("the switch off clears and silences", () => {
-  const decision = Alerts.decideAqNotification(5, 4, 3, false)
+  const decision = Alerts.decide(5, 3, 4, false)
   assert.strictEqual(decision.notify, false)
-  assert.strictEqual(decision.notifiedBand, 0)
+  assert.strictEqual(decision.notified, 0)
 })
 
 // ----------------------------------------------------------------- wording

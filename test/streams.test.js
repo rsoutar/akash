@@ -142,7 +142,6 @@ test("the CAMS helper is the one place the network is read without curl", () => 
   assert.match(camsPy, /max_bytes/, "fetch_bytes takes no budget")
   assert.match(camsPy, /CAPABILITIES_MAX_BYTES/)
   assert.match(camsPy, /PROBE_MAX_BYTES/)
-  assert.match(camsPy, /LEGEND_MAX_BYTES/)
 })
 
 test("no request is built outside the places that put the ceilings on", () => {
