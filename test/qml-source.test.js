@@ -96,7 +96,7 @@ test("the legend is a strip docked under the map at the map's width", () => {
   // panel's own column, spans the map's width — and is not inside the bar pill,
   // which keeps its own one-line reading.
   assert.match(panel, /LegendStrip \{\s*\n\s*width: parent\.width/)
-  assert.match(panel, /mode: root\.shownAirLayerName !== "" \? root\.activeCategory : "radar"/)
+  assert.match(panel, /mode: root\.airShown \? root\.activeCategory : "radar"/)
   assert.match(panel, /layerLabel: root\.activeLayer \? CamsModel\.layerLabel/)
   assert.match(legend, /textFormat\s*:\s*Text\.PlainText/)
   assert.match(legend, /Color\.popups\.background/)

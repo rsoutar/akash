@@ -71,54 +71,16 @@ Column {
   })
 
   // The heading and the line under it are one block, with the switch centred
-  // against the whole of it rather than against the heading alone. The two
-  // lines say what the watch is and what it is doing, which is a single
-  // thing; separating them by a section gap read as two.
-  Item {
+  // against the whole of it rather than against the heading alone — see
+  // ui/AlertSection.qml, shared by both watches.
+  AlertSection {
     width: parent.width
-    implicitHeight: Math.max(alertsHeading.implicitHeight, alertsSwitch.implicitHeight)
-
-    Column {
-      id: alertsHeading
-      anchors.left: parent.left
-      anchors.right: alertsSwitch.left
-      anchors.rightMargin: Style.space(8)
-      anchors.verticalCenter: parent.verticalCenter
-      spacing: Style.space(2)
-
-      PanelSectionHeader {
-        id: alertsHeader
-        text: "STORM ALERTS"
-        foreground: root.foreground
-        fontFamily: Style.font.family
-      }
-
-      // What the watch is actually doing. Aligned with the heading, like
-      // every other caption in the panel — it belongs to it rather than to
-      // the rows below.
-      Text {
-        textFormat: Text.PlainText
-        width: parent.width
-        text: root.alertStatus
-        color: root.foreground
-        font.family: Style.font.family
-        font.pixelSize: Style.font.caption
-        opacity: 0.55
-        elide: Text.ElideRight
-      }
-    }
-
-    // At the size the rest of the shell gives a switch. This one is the
-    // panel's primary control, not a modifier qualifying a choice below it.
-    ToggleSwitch {
-      id: alertsSwitch
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      checked: root.alertsEnabled
-      busy: root.alertsEnabled && root.service ? root.service.checking : false
-      foreground: root.foreground
-      onToggled: root.alertsToggled()
-    }
+    title: "STORM ALERTS"
+    status: root.alertStatus
+    checked: root.alertsEnabled
+    busy: root.alertsEnabled && root.service ? root.service.checking : false
+    foreground: root.foreground
+    onToggled: root.alertsToggled()
   }
 
   // Only while alerts are on: with them off there is nothing to tune, and
@@ -160,45 +122,14 @@ Column {
   // The air-quality watch, laid out like the storm's. It shares the probe
   // cadence — hourly, the model's own — rather than the storm's ten minutes,
   // because the model behind it updates no faster.
-  Item {
+  AlertSection {
     width: parent.width
-    implicitHeight: Math.max(aqHeading.implicitHeight, aqSwitch.implicitHeight)
-
-    Column {
-      id: aqHeading
-      anchors.left: parent.left
-      anchors.right: aqSwitch.left
-      anchors.rightMargin: Style.space(8)
-      anchors.verticalCenter: parent.verticalCenter
-      spacing: Style.space(2)
-
-      PanelSectionHeader {
-        text: "AIR QUALITY"
-        foreground: root.foreground
-        fontFamily: Style.font.family
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        width: parent.width
-        text: root.aqStatus
-        color: root.foreground
-        font.family: Style.font.family
-        font.pixelSize: Style.font.caption
-        opacity: 0.55
-        elide: Text.ElideRight
-      }
-    }
-
-    ToggleSwitch {
-      id: aqSwitch
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      checked: root.aqAlertsEnabled
-      busy: root.aqAlertsEnabled && root.service ? root.service.aqChecking : false
-      foreground: root.foreground
-      onToggled: root.aqAlertsToggled()
-    }
+    title: "AIR QUALITY"
+    status: root.aqStatus
+    checked: root.aqAlertsEnabled
+    busy: root.aqAlertsEnabled && root.service ? root.service.aqChecking : false
+    foreground: root.foreground
+    onToggled: root.aqAlertsToggled()
   }
 
   // Band cut-offs are per species — "Poor" is 25 µg/m³ of PM2.5 and 90 of

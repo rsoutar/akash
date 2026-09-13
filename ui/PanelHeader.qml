@@ -31,8 +31,7 @@ Item {
   signal locationClicked()
 
   property color foreground: Color.foreground
-  property string fontFamily: Style.font.family
-
+  
   readonly property color liveColor: "#5FAF6F"
   readonly property color fetchColor: "#E08A3C"
 
@@ -57,7 +56,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       text: "Akash"
       color: root.foreground
-      font.family: root.fontFamily
+      font.family: Style.font.family
       font.pixelSize: Style.font.title
       font.bold: true
     }
@@ -68,7 +67,7 @@ Item {
       visible: root.locationName !== ""
       text: "·"
       color: Qt.darker(root.foreground, 1.5)
-      font.family: root.fontFamily
+      font.family: Style.font.family
       font.pixelSize: Style.font.title
     }
 
@@ -91,7 +90,7 @@ Item {
         text: root.locationName
         color: Qt.darker(root.foreground, 1.4)
         opacity: 0.85
-        font.family: root.fontFamily
+        font.family: Style.font.family
         font.pixelSize: Style.font.caption
         // A long saved name must never shove the status cluster off the
         // header's right edge, so it ends where the cluster begins — and
@@ -122,7 +121,7 @@ Item {
       text: "Set a location"
       color: Qt.darker(root.foreground, 1.5)
       opacity: 0.55
-      font.family: root.fontFamily
+      font.family: Style.font.family
       font.pixelSize: Style.font.caption
 
       MouseArea {
@@ -147,7 +146,7 @@ Item {
       text: root.updatedAgo
       color: Qt.darker(root.foreground, 1.5)
       opacity: 0.7
-      font.family: root.fontFamily
+      font.family: Style.font.family
       font.pixelSize: Style.font.caption
     }
   }
@@ -184,7 +183,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       text: root.fetching ? "Fetching" : "Live"
       color: root.fetching ? root.fetchColor : root.liveColor
-      font.family: root.fontFamily
+      font.family: Style.font.family
       font.pixelSize: Style.font.caption
       font.bold: true
     }

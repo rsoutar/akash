@@ -103,7 +103,9 @@ through that CLI; the watch re-centres the radar live. The picker also
 accepts exact GPS coordinates as an alternative entry: a name plus a lat/lon
 pair, typed in the picker's coordinates mode, validated against the same
 shape the CLI accepts, and written through the same `--set <name> <lat>,<lon>`
-call. A typed point is not a parallel store — it is the same single
+call. A longitude in the 0–360 east convention is normalised onto the globe
+(`TileMath.wrapLongitude`) rather than rejected, so a reading of 180.5°E
+becomes 179.5°W. A typed point is not a parallel store — it is the same single
 location, made sharper, and the stock widget continues to work from it as it
 does from a geocoded coordinate. The plugin never writes Omarchy, Hyprland
 or system configuration outside its own shell.json entry.
@@ -132,7 +134,7 @@ service's summary properties; they poll nothing themselves.
 `cams.py` is the isolated CAMS/network helper: the capabilities cache
 (`caps.json`, refreshed at most every 6 hours), the WMS `GetFeatureInfo`
 probe, region-from-timezone, and per-endpoint byte ceilings (1 MiB
-capabilities, 4 KiB probe, 64 KiB legend) enforced mid-stream. Every process
+capabilities, 4 KiB probe) enforced mid-stream. Every process
 that reads stdout back into the shell process is bounded the same way, and
 `test/streams.test.js` pins each stream and its ceiling. The service points
 its readers at `caps.json` and `state.json` at construction, so a cache left
@@ -157,7 +159,7 @@ visual call is open, change the running picture and look at it.
 
 ## Future direction
 
-A Rust engine in the omastorm style — a release binary, sha256-pinned, run as
+A Rust engine release binary, sha256-pinned, run as
 a daemon the shell talks to — is the right path only if a raw local-decode
 data source is ever added: a national high-resolution radar feed, or motion
 analysis over frames. Only then does the decode cost justify a compiled

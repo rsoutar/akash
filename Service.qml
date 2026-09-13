@@ -28,9 +28,12 @@ import "lib/Settings.js" as Settings
 Item {
   id: root
 
-  // Injected by the shell (forwarded by BarWidget).
-  property var shell: null
   property var settings: ({})
+
+  // Path to a bundled file, with the file:// prefix a resolved URL carries.
+  function pluginFile(name) {
+    return Qt.resolvedUrl(name).toString().replace("file://", "")
+  }
 
   // ---------------------------------------------------------------------------
   // Alert configuration
@@ -276,7 +279,7 @@ Item {
 
   function loadBasemap() {
     if (basemap || basemapFile.path !== "") return
-    basemapFile.path = Qt.resolvedUrl("data/basemap.bin").toString().replace("file://", "")
+    basemapFile.path = pluginFile("data/basemap.bin")
   }
 
   FileView {
@@ -347,21 +350,19 @@ Item {
   // than a broken picker.
   property var camsCaps: null
   property var camsState: null
-  readonly property bool camsReady: camsCaps !== null && camsState !== null
   readonly property string camsRegion: camsState ? String(camsState.region || "europe") : "europe"
   readonly property string camsConfigDir: Quickshell.env("HOME") + "/.config/omarchy/akash"
 
-  // Whether init has been offered this session. `camsReady` is no longer the
-  // gate — the cached files load by themselves — but the six-hour staleness
-  // refresh still has to happen once, so the first acquire decides. Reset on a
-  // process that never forked, so a transient failure can be retried.
+  // Whether init has been offered this session. The cached files load by
+  // themselves, but the six-hour staleness refresh still has to happen once,
+  // so the first acquire decides. Reset on a process that never forked, so a
+  // transient failure can be retried.
   property bool camsWarmed: false
 
   function ensureCams() {
     if (camsWarmed || camsInitProc.running) return
     camsWarmed = true
-    var script = Qt.resolvedUrl("cams.py").toString().replace("file://", "")
-    camsInitProc.launch(["python3", script, "init"])
+    camsInitProc.launch(["python3", pluginFile("cams.py"), "init"])
   }
 
   BoundedProcess {
@@ -479,21 +480,27 @@ Item {
   readonly property bool aqStale: aqCheckTime > 0
     && (Date.now() - aqCheckTime) > 2 * 3600 * 1000 && nowTick >= 0
 
+  // The tracked layer's species key, "" until one is attached. Everything that
+  // classifies a reading passes this rather than re-testing aqLayer.
+  readonly property string aqSpecies: aqLayer ? String(aqLayer.species || "") : ""
+
+  // The probe answer, cleaned for reading and printing. NaN while no reading
+  // is in hand.
+  readonly property double aqValueRounded: isFinite(aqValue) ? Math.round(aqValue * 10) / 10 : NaN
+
   // "PM2.5 9.6 µg/m3 · Poor" — the tooltip and the pill's reason to exist.
   // Empty until a real reading is in hand: a "…" that never resolves and an
   // error that renders as a value are both silences dressed as answers.
   readonly property string aqSummary: {
     if (!aqLayer || !isFinite(aqValue)) return ""
-    var value = Math.round(aqValue * 10) / 10
-    var text = aqLayer.short + " " + value + (aqUnit !== "" ? " " + aqUnit : "")
+    var text = aqLayer.short + " " + aqValueRounded + (aqUnit !== "" ? " " + aqUnit : "")
     return aqLevel ? text + " · " + aqLevel.name : text
   }
 
   // Just the figure for the pill itself; the full summary goes in the tooltip.
   readonly property string aqPillText: {
     if (!isFinite(aqValue)) return ""
-    var value = Math.round(aqValue * 10) / 10
-    return value + (aqUnit !== "" ? " " + aqUnit : "")
+    return aqValueRounded + (aqUnit !== "" ? " " + aqUnit : "")
   }
 
   // The CAMS model does not update faster than about an hour, so a probe
@@ -520,7 +527,7 @@ Item {
 
     aqLastFetchMs = now
     aqChecking = true
-    var script = Qt.resolvedUrl("cams.py").toString().replace("file://", "")
+    var script = pluginFile("cams.py")
     var command = ["python3", script, "probe",
                    "--layer", layer,
                    "--lat", String(point.lat),
@@ -590,7 +597,7 @@ Item {
       for (var i = 0; i < results.length; i++) {
         var entry = results[i]
         if (entry.value === null || entry.value === undefined || !isFinite(entry.value)) continue
-        var band = CamsModel.aqBandIndex(root.aqLayer ? root.aqLayer.species : "", entry.value)
+        var band = CamsModel.aqBandIndex(root.aqSpecies, entry.value)
         if (band > worst) {
           worst = band
           worstClock = entry.time !== "" ? Alerts.clockFromTimestamp(Date.parse(entry.time) / 1000) : ""
@@ -609,23 +616,23 @@ Item {
 
   function evaluateAqAlert() {
     if (aqWorstBand < 0) return  // nothing in hand to judge
-    var decision = Alerts.decideAqNotification(aqWorstBand, aqNotifiedBand, aqThresholdBand, aqAlertsEnabled)
-    aqNotifiedBand = decision.notifiedBand
+    var decision = Alerts.decide(aqWorstBand, aqThresholdBand, aqNotifiedBand, aqAlertsEnabled)
+    aqNotifiedBand = decision.notified
     if (decision.notify) notifyAq()
   }
 
   function notifyAq() {
-    var level = CamsModel.aqLevel(aqLayer ? aqLayer.species : "", aqValue)
+    var level = CamsModel.aqLevel(aqSpecies, aqValue)
     if (!level) return
     var text = Alerts.aqNotificationText({
       band: aqWorstBand,
-      bandName: Alerts.AQ_BAND_NAMES[aqWorstBand] || level.name,
-      currentBand: CamsModel.aqBandIndex(aqLayer ? aqLayer.species : "", aqValue),
+      bandName: CamsModel.BAND_NAMES[aqWorstBand] || level.name,
+      currentBand: CamsModel.aqBandIndex(aqSpecies, aqValue),
       worstBand: aqWorstBand,
-      worstBandName: Alerts.AQ_BAND_NAMES[aqWorstBand] || "",
+      worstBandName: CamsModel.BAND_NAMES[aqWorstBand] || "",
       worstClock: aqWorstClock,
       layerShort: aqLayer.short,
-      value: Math.round(aqValue * 10) / 10,
+      value: aqValueRounded,
       unit: aqUnit
     }, locationName)
 
@@ -726,8 +733,6 @@ Item {
   // ---------------------------------------------------------------------------
   // Forecast polling
   // ---------------------------------------------------------------------------
-
-  property var forecast: null
 
   // When a check last produced an outlook, and when one last came back at all.
   // Different questions: a request that fails, or answers with nothing usable,
@@ -900,7 +905,6 @@ Item {
     // on the strength of a broken response.
     if (!outlook) return
 
-    forecast = data
     outlookCape = outlook.cape
     outlookGust = outlook.gust
     outlookPrecipitation = outlook.precipitation
@@ -922,8 +926,8 @@ Item {
   property int notifiedLevel: 0
 
   function evaluateAlert() {
-    var decision = Alerts.decideNotification(outlookLevel, notifiedLevel, alertThreshold, alertsEnabled)
-    notifiedLevel = decision.notifiedLevel
+    var decision = Alerts.decide(outlookLevel, Alerts.levelValue(alertThreshold), notifiedLevel, alertsEnabled)
+    notifiedLevel = decision.notified
     if (decision.notify) notify()
   }
 

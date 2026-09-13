@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline checks for cams.py: the parts that must hold without the network.
 
-The live WMS is exercised by hand (init, probe, legend); these pin the logic
+The live WMS is exercised by hand (init, probe); these pin the logic
 that a rename or a corrupt cache would otherwise break silently. Run with:
 
     python3 test/cams.test.py
@@ -61,9 +61,9 @@ class CacheStaleness(unittest.TestCase):
         self.assertTrue(cams.cache_is_stale())
 
     def test_state_filters_unknown_keys(self):
-        cams.atomic_write(cams.state_path(), {"layer": "composition_o3", "bogus": 1})
+        cams.atomic_write(cams.state_path(), {"barMetric": "composition_o3", "bogus": 1})
         state = cams.current_state()
-        self.assertEqual(state["layer"], "composition_o3")
+        self.assertEqual(state["barMetric"], "composition_o3")
         self.assertNotIn("bogus", state)
 
 
@@ -126,7 +126,8 @@ class LayerClassification(unittest.TestCase):
         layers = cams.parse_capabilities(xml)
         self.assertEqual(len(layers), 1)
         self.assertEqual(layers[0]["short"], "PM2.5")
-        self.assertEqual(layers[0]["styles"], ["default"])
+        self.assertEqual(layers[0]["time"],
+            "2026-01-01T00:00:00Z/2026-01-02T00:00:00Z")
 
 
 class ProbeResponse(unittest.TestCase):
@@ -164,12 +165,11 @@ class FetchCeilings(unittest.TestCase):
     # against. A ceiling under what the service really sends is an outage
     # nobody would think to look for, so the measured sizes are pinned here.
     def test_ceiling_constants_leave_measured_room(self):
-        # Measured live: capabilities 604,251 B; GetFeatureInfo 758 B; legend
-        # PNG 1,610 B. The probe's success bodies are tiny, but a
-        # ServiceException XML answer runs bigger — hence 4 KiB, not 1 KiB.
+        # Measured live: capabilities 604,251 B; GetFeatureInfo 758 B. The
+        # probe's success bodies are tiny, but a ServiceException XML answer
+        # runs bigger — hence 4 KiB, not 1 KiB.
         self.assertGreaterEqual(cams.CAPABILITIES_MAX_BYTES, 906_376)
         self.assertGreaterEqual(cams.PROBE_MAX_BYTES, 4 * 1024)
-        self.assertGreaterEqual(cams.LEGEND_MAX_BYTES, 64 * 1024)
 
     def test_one_way_to_read_the_network(self):
         # The QML-side stream inventory holds cams.py to a single urlopen,
@@ -200,7 +200,7 @@ class FetchCeilings(unittest.TestCase):
         with mock.patch.object(cams.urllib.request, "urlopen",
                                return_value=_FakeResponse([b"y" * 9_000])):
             reading = cams.probe_value("composition_europe_pm2p5_forecast_surface",
-                                       "", 51.5, -0.1, "2026-01-01T00:00:00Z")
+                                       51.5, -0.1, "2026-01-01T00:00:00Z")
         self.assertEqual(reading, {"value": None, "unit": ""})
 
 

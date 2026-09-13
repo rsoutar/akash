@@ -155,7 +155,9 @@ namesakes elsewhere.
 For the sharpest answer, set your exact position instead: edit the location
 and switch **SET BY** to **GPS coordinates**. Enter what the header should
 show (e.g. "Home"), plus the latitude and longitude of your building, and
-Save. The pair is written to the same shared file through the same
+Save. Longitudes past 180 — the 0–360 east convention some GPS hardware
+reports — wrap onto the globe, so 180.5°E lands you 179.5°W. The pair is
+written to the same shared file through the same
 `omarchy-weather-location` call as any city — the radar centres on it, the
 forecast is sampled around it, and the alert radius and air-quality reading
 follow — so in a city where downtown and where you live are a few

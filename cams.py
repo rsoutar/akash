@@ -27,13 +27,11 @@ import io
 import json
 import os
 import re
-import struct
 import tempfile
 import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-import zlib
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +43,6 @@ CACHE_MAX_AGE = 6 * 60 * 60  # seconds; refresh capabilities if older than this
 CAPS_CACHE_VERSION = 1  # bump when the cache layout changes; old caches rebuild
 DEFAULT_LAYER = "composition_europe_pm2p5_forecast_surface"  # Europe first-run: Air Quality / PM2.5
 DEFAULT_LAYER_GLOBAL = "composition_pm2p5"  # outside Europe: coarser global PM2.5
-DEFAULT_STYLE = ""  # empty = the layer's own WMS default, always valid
 
 # CAMS runs a high-res regional ensemble over Europe (composition_europe_*) and
 # a coarser global model everywhere (composition_*). Inside this box we curate
@@ -211,19 +208,11 @@ def parse_capabilities(xml_text: str) -> list[dict[str, Any]]:
             (c for c in element if local_name(c.tag) == "Dimension" and c.get("name") == "time"),
             None,
         )
-        styles = [
-            s.text.strip()
-            for style in element
-            if local_name(style.tag) == "Style"
-            for s in style
-            if local_name(s.tag) == "Name" and s.text
-        ]
         layers.append({
             "name": name,
             "title": (title_el.text.strip() if title_el is not None and title_el.text else name),
             "default": (dim_el.get("default") if dim_el is not None else None),
             "time": (dim_el.text.strip() if dim_el is not None and dim_el.text else None),
-            "styles": styles,
             **tags,
         })
         element.clear()
@@ -233,12 +222,11 @@ def parse_capabilities(xml_text: str) -> list[dict[str, Any]]:
 # Byte ceilings on every response this helper reads, while it streams —
 # `--max-time`'s sibling: a host that answers fast enough can send as much as
 # the link carries for the whole window. Measured against the live endpoints:
-# the capabilities document is 604 KB, a GetFeatureInfo answer 758 B, a legend
-# PNG 1.6 KB. A ceiling under what the service really sends is an outage
-# nobody would think to look for; these leave room above that.
+# the capabilities document is 604 KB and a GetFeatureInfo answer 758 B. A
+# ceiling under what the service really sends is an outage nobody would think
+# to look for; these leave room above that.
 CAPABILITIES_MAX_BYTES = 1 << 20  # 1 MiB, ~1.7× the measured document
 PROBE_MAX_BYTES = 4 * 1024  # success bodies are ~758 B; ServiceException XML runs bigger
-LEGEND_MAX_BYTES = 64 * 1024  # the decode is bounded again by the 350×50 geometry
 
 
 def fetch_bytes(url: str, timeout: int, max_bytes: int) -> bytes:
@@ -359,20 +347,10 @@ def default_state() -> dict[str, Any]:
     # Europe-wide frame when the timezone can't be resolved.
     center = timezone_center() or {"lat": 49.0, "lon": 15.0}
     region = user_region()
-    layer = DEFAULT_LAYER if region == "europe" else DEFAULT_LAYER_GLOBAL
     return {
-        "layer": layer,
-        "style": DEFAULT_STYLE,
         "home": dict(center),  # fixed location for the bar readout/alerts
-        "barMetric": layer,  # which layer the bar indicator tracks
+        "barMetric": DEFAULT_LAYER if region == "europe" else DEFAULT_LAYER_GLOBAL,  # which layer the bar indicator tracks
         "region": region,  # "europe" | "global"; picks curated layers + Allergens
-        "center": center,
-        "zoom": 6,  # tighter on the timezone's city, region still visible
-        "timeIndex": -1,
-        "overlayOpacity": 0.6,
-        "enabledSpecies": {},  # per-category layer checklist (empty = all shown)
-        "lastLayer": {},  # last-viewed layer per category, for chip switching
-        "custom": False,  # the "Custom" search tab is active
     }
 
 
@@ -387,22 +365,19 @@ def current_state() -> dict[str, Any]:
 def initialize(force: bool = False) -> dict[str, Any]:
     state = current_state()
     atomic_write(state_path(), state)
-    refreshed = False
     if force or cache_is_stale():
         try:
             write_capabilities()
-            refreshed = True
-        except Exception as error:  # network/parse failure must not break init
-            state["capsError"] = str(error)
-    cache = read_json(caps_path(), {"layerCount": 0})
-    return {**state, "layerCount": cache.get("layerCount", 0), "capsRefreshed": refreshed}
+        except Exception:  # network/parse failure must not break init
+            pass  # the stale cache, if any, is still readable below
+    return state
 
 
 # ---------------------------------------------------------------------------
 # Point probe (WMS GetFeatureInfo)
 # ---------------------------------------------------------------------------
 
-def probe_value(layer: str, style: str, lat: float, lon: float, time: str) -> dict[str, Any]:
+def probe_value(layer: str, lat: float, lon: float, time: str) -> dict[str, Any]:
     """GetFeatureInfo at a lat/lon: build a small EPSG:3857 box around the
     point and query its centre pixel. Returns {"value": float|None, "unit": str}
     — value None on any failure, so callers show "…" rather than an error."""
@@ -416,7 +391,7 @@ def probe_value(layer: str, style: str, lat: float, lon: float, time: str) -> di
         "service=WMS", "version=1.3.0", "request=GetFeatureInfo",
         "layers=" + urllib.parse.quote(layer),
         "query_layers=" + urllib.parse.quote(layer),
-        "styles=" + urllib.parse.quote(style or ""),
+        "styles=",  # empty = the layer's own WMS default; the plugin never chooses one
         "crs=EPSG:3857",
         "bbox=" + ",".join(str(v) for v in (x - d, y - d, x + d, y + d)),
         "width=100", "height=100", "i=50", "j=50",
@@ -444,97 +419,6 @@ def probe_value(layer: str, style: str, lat: float, lon: float, time: str) -> di
     return {"value": float(match.group(1)), "unit": unit}
 
 
-def legend_url(layer: str, style: str) -> str:
-    return WMS_BASE + "&" + "&".join([
-        "request=GetLegend",
-        "layers=" + urllib.parse.quote(layer),
-        "styles=" + urllib.parse.quote(style or ""),
-        "width=350", "height=50", "format=image/png",
-    ])
-
-
-# ---------------------------------------------------------------------------
-# Legend decoding
-# ---------------------------------------------------------------------------
-
-def decode_png(data: bytes) -> tuple[int, int, int, bytes]:
-    """Minimal decoder for 8-bit, non-interlaced RGB/RGBA PNGs (all the WMS
-    legends are). Returns (width, height, channels, raw_pixels)."""
-    if data[:8] != b"\x89PNG\r\n\x1a\n":
-        raise ValueError("not a PNG")
-    i, width, height, color_type, idat = 8, 0, 0, 0, b""
-    while i < len(data):
-        length = struct.unpack(">I", data[i:i + 4])[0]
-        kind = data[i + 4:i + 8]
-        chunk = data[i + 8:i + 8 + length]
-        i += 12 + length
-        if kind == b"IHDR":
-            width, height, _bit, color_type = struct.unpack(">IIBB", chunk[:10])
-        elif kind == b"IDAT":
-            idat += chunk
-        elif kind == b"IEND":
-            break
-    channels = 4 if color_type == 6 else 3
-    raw = zlib.decompress(idat)
-    stride = width * channels
-    out = bytearray()
-    prev = bytearray(stride)
-    pos = 0
-    for _ in range(height):
-        f = raw[pos]; pos += 1
-        line = bytearray(raw[pos:pos + stride]); pos += stride
-        for x in range(stride):
-            a = line[x - channels] if x >= channels else 0
-            b = prev[x]
-            c = prev[x - channels] if x >= channels else 0
-            if f == 1: line[x] = (line[x] + a) & 255
-            elif f == 2: line[x] = (line[x] + b) & 255
-            elif f == 3: line[x] = (line[x] + ((a + b) >> 1)) & 255
-            elif f == 4:
-                p = a + b - c
-                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
-                pr = a if pa <= pb and pa <= pc else (b if pb <= pc else c)
-                line[x] = (line[x] + pr) & 255
-        out += line
-        prev = line
-    return width, height, channels, bytes(out)
-
-
-def legend_colors(layer: str, style: str) -> list[str]:
-    """Discrete band colours of a layer/style legend, low→high, as hex. Samples
-    the colour bar's mid row, coalesces runs, and drops the white bookends."""
-    data = fetch_bytes(legend_url(layer, style), 20, LEGEND_MAX_BYTES)
-    width, height, channels, buf = decode_png(data)
-    y = height // 2
-
-    def pixel(x: int) -> tuple[int, int, int]:
-        o = (y * width + x) * channels
-        return buf[o], buf[o + 1], buf[o + 2]
-
-    runs: list[tuple[tuple[int, int, int], int]] = []
-    current: tuple[int, int, int] | None = None
-    count = 0
-    for x in range(2, width - 2):
-        c = pixel(x)
-        if current is None or sum(abs(c[k] - current[k]) for k in range(3)) > 24:
-            if current is not None:
-                runs.append((current, count))
-            current, count = c, 1
-        else:
-            count += 1
-    if current is not None:
-        runs.append((current, count))
-
-    colors = []
-    for (r, g, b), n in runs:
-        if n < 6:
-            continue
-        if r > 245 and g > 245 and b > 245:  # white border/background
-            continue
-        colors.append("#%02x%02x%02x" % (r, g, b))
-    return colors
-
-
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -544,16 +428,8 @@ def parser() -> argparse.ArgumentParser:
     commands = result.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init")
     init.add_argument("--force", action="store_true")
-    caps = commands.add_parser("capabilities")
-    caps.add_argument("--force", action="store_true")
-    commands.add_parser("state")
-    commands.add_parser("caps-path")
-    legend = commands.add_parser("legend")
-    legend.add_argument("--layer", required=True)
-    legend.add_argument("--style", default="")
     probe = commands.add_parser("probe")
     probe.add_argument("--layer", required=True)
-    probe.add_argument("--style", default="")
     probe.add_argument("--lat", type=float, required=True)
     probe.add_argument("--lon", type=float, required=True)
     # Repeatable: one invocation answers the point now and at the next few
@@ -567,32 +443,11 @@ def main() -> int:
     args = parser().parse_args()
     if args.command == "init":
         print(json.dumps(initialize(args.force), separators=(",", ":")))
-    elif args.command == "capabilities":
-        if args.force or cache_is_stale():
-            try:
-                write_capabilities()
-            except Exception:
-                pass  # the stale cache, if any, is still readable below
-        cache = read_json(caps_path(), {"layerCount": 0, "generatedAt": 0})
-        print(json.dumps({"layerCount": cache.get("layerCount", 0),
-                          "generatedAt": cache.get("generatedAt", 0)},
-                         separators=(",", ":")))
-    elif args.command == "state":
-        print(json.dumps(current_state(), separators=(",", ":")))
-    elif args.command == "caps-path":
-        print(caps_path())
-    elif args.command == "legend":
-        try:
-            colors = legend_colors(args.layer, args.style)
-        except Exception:
-            colors = []
-        print(json.dumps({"layer": args.layer, "style": args.style, "colors": colors},
-                         separators=(",", ":")))
     elif args.command == "probe":
         times = args.time or [""]
         results = []
         for time in times:
-            reading = probe_value(args.layer, args.style, args.lat, args.lon, time)
+            reading = probe_value(args.layer, args.lat, args.lon, time)
             results.append({"time": time, "value": reading["value"], "unit": reading["unit"]})
         print(json.dumps({"layer": args.layer, "results": results}, separators=(",", ":")))
     return 0

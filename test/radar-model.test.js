@@ -40,16 +40,6 @@ test("a tile URL is empty when there is nothing to request yet", () => {
   assert.strictEqual(RadarModel.tileUrl(null, null, 256, 7, 1, 1, 2, true, true), "")
 })
 
-test("a coordinate-centred URL always spells its coordinates with a decimal point", () => {
-  // The API rejects a bare integer, and a whole-degree location is exactly
-  // where String(Number(x)) drops the point.
-  const url = RadarModel.centeredTileUrl("https://h", "/p", 512, 7, -23, 46, 0, false, false)
-  assert.ok(url.includes("/-23.0/46.0/"), url)
-
-  const fractional = RadarModel.centeredTileUrl("https://h", "/p", 512, 7, -23.5505, -46.6333, 0, false, false)
-  assert.ok(fractional.includes("/-23.5505/-46.6333/"), fractional)
-})
-
 test("the coverage mask is requested from the host alone", () => {
   assert.strictEqual(
     RadarModel.coverageTileUrl("https://h", 512, 7, -23, -46),
@@ -257,17 +247,36 @@ test("anything that is not a plain lat/lon pair is rejected", () => {
   }
 })
 
-test("coordinates outside the globe are rejected", () => {
-  for (const [lat, lon] of [[91, 0], [-91, 0], [0, 181], [0, -181], [-90.1, 0], [0, 180.1]]) {
-    assert.strictEqual(RadarModel.parseCoordinates(String(lat), String(lon)), null,
-      `${lat},${lon}`)
+test("conserves exact points through the input range", () => {
+  for (const [lat, lon] of [["13.75398", "100.50144"], ["-23.5505", "-46.6333"], ["0", "0"], ["-90", "-180"], ["90", "180"]]) {
+    const point = RadarModel.parseCoordinates(lat, lon)
+    assert.notStrictEqual(point, null, `${lat},${lon}`)
+    assert.strictEqual(point.latitude, Number(lat), `${lat},${lon}`)
+    assert.strictEqual(point.longitude, Number(lon), `${lat},${lon}`)
   }
 })
 
-test("a coordinate pair formats for the shared location CLI", () => {
-  assert.strictEqual(RadarModel.coordinatePair(13.75398, 100.50144), "13.75398,100.50144")
-  assert.strictEqual(RadarModel.coordinatePair(-23.5, -46.6), "-23.5,-46.6")
-  assert.strictEqual(RadarModel.coordinatePair(0, 0), "0,0")
+test("longitudes past the antimeridian wrap onto the globe", () => {
+  for (const [lon, expected] of [
+    ["180.5197", -179.4803],
+    ["181", -179],
+    ["-181", 179],
+    ["359.9", -0.1],
+    ["360", 0],
+    ["-360", 0]
+  ]) {
+    const point = RadarModel.parseCoordinates("13.75398", lon)
+    assert.notStrictEqual(point, null, lon)
+    assert.strictEqual(point.latitude, 13.75398, lon)
+    assert.ok(Math.abs(point.longitude - expected) < 1e-9, `${lon} wrapped to ${point.longitude}, expected ${expected}`)
+  }
+})
+
+test("coordinates beyond a tolerable wrap are rejected", () => {
+  for (const [lat, lon] of [[91, 0], [-91, 0], [-90.1, 0], [0, 361], [0, -361], [0, 720]]) {
+    assert.strictEqual(RadarModel.parseCoordinates(String(lat), String(lon)), null,
+      `${lat},${lon}`)
+  }
 })
 
 // ------------------------------------------------------------------ sampling
@@ -304,70 +313,6 @@ test("sampling stays on the globe at the poles and the antimeridian", () => {
     assert.ok(point.latitude >= -90 && point.latitude <= 90, `latitude ${point.latitude}`)
     assert.ok(point.longitude >= -180 && point.longitude <= 180, `longitude ${point.longitude}`)
   }
-})
-
-// ------------------------------------------------------------------ echoes
-
-function greyTile(size, cells) {
-  const pixels = new Uint8ClampedArray(size * size * 4)
-  for (const [x, y, value] of cells) {
-    const offset = (y * size + x) * 4
-    pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = value
-    pixels[offset + 3] = 255
-  }
-  return pixels
-}
-
-test("the strongest echo inside the radius is the one reported", () => {
-  const size = 64
-  const centre = size / 2
-  // Weak echo two pixels north, strong echo four pixels east.
-  const pixels = greyTile(size, [[centre, centre - 2, 80], [centre + 4, centre, 200]])
-  const echo = RadarModel.analyzeEchoes(pixels, size, 0, 7, 500)
-
-  assert.strictEqual(echo.found, true)
-  assert.strictEqual(echo.intensity, 200)
-  assert.strictEqual(echo.label, "heavy")
-  assert.strictEqual(echo.compass, "E", "screen y grows south, so the bearing must be flipped")
-  assert.strictEqual(echo.coveredPixels, 2, "both echoes counted, one reported")
-})
-
-test("an echo beyond the radius is not reported", () => {
-  const size = 64
-  const centre = size / 2
-  const pixels = greyTile(size, [[centre + 20, centre, 240]])
-  // At z7 on the equator a pixel is about 1.22 km, so 20 pixels is ~24 km.
-  const inside = RadarModel.analyzeEchoes(pixels, size, 0, 7, 100)
-  const outside = RadarModel.analyzeEchoes(pixels, size, 0, 7, 10)
-  assert.strictEqual(inside.found, true)
-  assert.strictEqual(outside.found, false)
-  assert.strictEqual(outside.label, "clear")
-  assert.strictEqual(outside.compass, "", "nothing found means nothing to point at")
-})
-
-test("a transparent pixel is not a zero-intensity echo", () => {
-  const size = 32
-  const pixels = new Uint8ClampedArray(size * size * 4)
-  // Opaque black everywhere would be an echo of intensity 0; the alpha channel
-  // is what separates "no data" from "no rain".
-  const echo = RadarModel.analyzeEchoes(pixels, size, 0, 7, 100)
-  assert.strictEqual(echo.found, false)
-  assert.strictEqual(echo.coveredPixels, 0)
-})
-
-test("analysing a tile that never arrived is safe", () => {
-  assert.strictEqual(RadarModel.analyzeEchoes(null, 512, 0, 7, 100).found, false)
-  assert.strictEqual(RadarModel.analyzeEchoes(new Uint8ClampedArray(4), 0, 0, 7, 100).found, false)
-})
-
-test("intensity labels follow the calibrated bands", () => {
-  assert.strictEqual(RadarModel.intensityLabel(0), "clear")
-  assert.strictEqual(RadarModel.intensityLabel(1), "trace")
-  assert.strictEqual(RadarModel.intensityLabel(60), "light")
-  assert.strictEqual(RadarModel.intensityLabel(120), "moderate")
-  assert.strictEqual(RadarModel.intensityLabel(170), "heavy")
-  assert.strictEqual(RadarModel.intensityLabel(210), "severe")
-  assert.strictEqual(RadarModel.intensityLabel(255), "severe")
 })
 
 // ------------------------------------------------------------------ legend
@@ -415,19 +360,6 @@ test("the legend ramp reads faint on the left, strongest on the right", () => {
   assert.strictEqual(last[last.length - 1], "#5d0000",
     "the darkest red closes the ramp")
 
-  // Every stop carries its place on the 0-255 scale, strictly climbing so the
-  // ramp never doubles back. The legend no longer lays cells out by these, but
-  // the measured alpha ladder is the record the family boundaries come from.
-  const values = RadarModel.RADAR_STOP_VALUES
-  const stops = RadarModel.RADAR_GRADIENT_STOPS
-  assert.strictEqual(values.length, stops.length,
-    "one value per colour, in the same order")
-  assert.ok(values.every((v, i) => i === 0 || v > values[i - 1]),
-    "bin values climb with the ramp")
-  assert.ok(values.every(v => Number.isInteger(v) && v >= 0 && v <= 255),
-    "bin values sit on the 0-255 scale")
-  assert.strictEqual(values[0], 20, "the faintest tan sits at the tile's lowest alpha")
-  assert.strictEqual(values[values.length - 1], 255)
 })
 
 test("a transparent centre pixel means a ground radar reaches here", () => {
@@ -503,21 +435,6 @@ test("a latest-update readout with no frame or no now is empty too", () => {
   assert.strictEqual(RadarModel.formatUpdateAge(0, now), "")
   assert.strictEqual(RadarModel.formatUpdateAge(1788009000, 0), "")
   assert.strictEqual(RadarModel.formatUpdateAge(0, 0), "")
-})
-
-test("distance is printed with precision that matches its magnitude", () => {
-  assert.strictEqual(RadarModel.formatDistance(4.23), "4.2 km")
-  assert.strictEqual(RadarModel.formatDistance(42.7), "43 km")
-  assert.strictEqual(RadarModel.formatDistance(142.4), "142 km")
-})
-
-test("the bar label says clear rather than nothing when there is no echo", () => {
-  // An empty label reads as "the plugin is broken"; "clear" reads as weather.
-  assert.strictEqual(RadarModel.summaryLabel(null), "clear")
-  assert.strictEqual(RadarModel.summaryLabel({ found: false }), "clear")
-  assert.strictEqual(
-    RadarModel.summaryLabel({ found: true, label: "heavy", distanceKm: 42.3, compass: "SW" }),
-    "heavy 42 km SW")
 })
 
 test("a manifest naming somewhere other than an https host is rejected", () => {

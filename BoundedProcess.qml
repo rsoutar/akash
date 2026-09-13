@@ -23,10 +23,9 @@ Process {
   // failure backoff or report an outage the user caused by flipping a switch.
   property bool cancelRequested: false
 
-  // Guards the fork-that-never-ran case; `output` is the collected stdout,
-  // to be decided on by the owner's handlers.
+  // Guards the fork-that-never-ran case; the collected stdout travels out on
+  // the `responded` signal for the owner's handlers to decide on.
   property bool answered: false
-  readonly property string output: out.text
 
   // The one way to run a command. Resetting `answered` here rather than at
   // the call sites means a run can never inherit the previous run's answer.

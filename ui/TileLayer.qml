@@ -81,8 +81,6 @@ Item {
     }
   }
 
-  signal tileFailed()
-
   clip: true
 
   // Laid out in source-zoom space, then scaled onto the screen. Passing the
@@ -166,10 +164,7 @@ Item {
         }
       }
 
-      onStatusChanged: {
-        if (status === Image.Error) root.tileFailed()
-        tile.settle()
-      }
+      onStatusChanged: tile.settle()
 
       Component.onDestruction: tile.settle()
     }

@@ -33,7 +33,6 @@ Panel {
   property var anchorItem: null
   property var hostWidget: null
   property var service: null
-  property bool openedFromHotkey: false
 
   // The bar tracks the widget in its slot, not this nested panel, so anything
   // the popout coordinator compares against has to be the widget.
@@ -54,11 +53,12 @@ Panel {
   readonly property bool aqAlertsEnabled: Settings.aqAlertsEnabled(settings)
   readonly property string aqBandName: {
     var band = Settings.aqThresholdBand(settings)
-    return band >= 0 && band < Alerts.AQ_BAND_NAMES.length ? Alerts.AQ_BAND_NAMES[band] : "Poor"
+    return band >= 0 && band < CamsModel.BAND_NAMES.length ? CamsModel.BAND_NAMES[band] : "Poor"
   }
   // Alerts below Moderate are noise: the EEA's own band-1 days are most days
-  // in most places, and a watch that fires daily is switched off.
-  readonly property var aqBandOptions: ["Moderate", "Poor", "Very poor", "Extremely poor"]
+  // in most places, and a watch that fires daily is switched off. The options
+  // are the band ladder's top four, so every string names a real band.
+  readonly property var aqBandOptions: CamsModel.BAND_NAMES.slice(2)
   readonly property bool smoothTiles: Settings.smoothTiles(settings)
   readonly property bool showSnow: Settings.showSnow(settings)
   readonly property int colorSchemeId: Settings.colorSchemeId(settings)
@@ -137,32 +137,35 @@ Panel {
     Qt.callLater(function() { locationPromptField.forceActiveFocus() })
   }
 
-  // Skipped, not answered: mark the question asked so it never reappears.
-  function dismissLocationPrompt() {
+  // Close the prompt for good: the question is asked exactly once, whether it
+  // was answered or skipped, so every way out of it marks it asked and hands
+  // focus back to the keyboard catcher.
+  function closeLocationPrompt() {
     locationPromptOpen = false
     persistSetting("locationPrompted", true)
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  // Skipped, not answered.
+  function dismissLocationPrompt() {
+    closeLocationPrompt()
   }
 
   // Chosen or free-typed. Mirrors commitLocation but for the prompt's own
   // field, and closes the box either way.
   function commitLocationPrompt() {
     var choice = RadarModel.locationCommit(locationPromptQuery, locationSuggestions, suggestionIndex)
-    locationPromptOpen = false
-    persistSetting("locationPrompted", true)
     if (choice.name) persistLocation(choice.name, choice.latitude, choice.longitude)
     else if (locationPromptQuery.trim() !== "") clearLocation()
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    closeLocationPrompt()
   }
 
   function promptPickSuggestion(suggestion) {
     if (!suggestion) return
-    locationPromptOpen = false
-    persistSetting("locationPrompted", true)
     // Save the picked city with its coordinates straight away rather than
     // round-tripping through the field, which would have lost them.
     if (suggestion.name) persistLocation(suggestion.name, suggestion.latitude, suggestion.longitude)
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    closeLocationPrompt()
   }
 
   // ---------------------------------------------------------------------------
@@ -302,11 +305,6 @@ Panel {
     chooseCategory(id)
   }
 
-  function chooseLayer(layer) {
-    if (!layer) return
-    setSelectedLayer(activeCategory, layer.name)
-  }
-
   // Air quality is the plugin's reason to exist, so as soon as the caps
   // arrive its first layer is selected — the overlay is on before the first
   // click. Clearing it from the picker is one ✕ away.
@@ -329,6 +327,11 @@ Panel {
   // switching chips never forget which layer each side had.
   property string shownAirLayerName: ""
   property string shownAirStepTime: ""
+
+  // Whether the air overlay is what the map is drawing, and the legend ends
+  // for its category when it is.
+  readonly property bool airShown: shownAirLayerName !== ""
+  readonly property var airLegendEnds: airShown ? CamsModel.legendEnds(activeCategory) : null
 
   function syncAirOverlay() {
     // Not the air menu, no air overlay — the selection stays for the return.
@@ -511,7 +514,7 @@ Panel {
     var parsed = RadarModel.parseCoordinates(locationPicker.coordinateLatitude,
       locationPicker.coordinateLongitude)
     if (!parsed) {
-      root.coordinateError = "Enter a plain latitude (−90 to 90) and longitude (−180 to 180)"
+      root.coordinateError = "Enter a plain latitude (−90 to 90) and longitude (−360 to 360; past ±180 wraps onto the globe)"
       return
     }
     var name = locationPicker.coordinateName.trim()
@@ -673,7 +676,6 @@ Panel {
     return index < 0 ? null : frames[index]
   }
 
-  readonly property string frameLabel: currentFrame ? RadarModel.formatFrameTime(currentFrame.time) : "--:--"
   readonly property bool isLatestFrame: Frames.isLatest(frames, frameIndex)
 
   // Jump to the newest frame in hand, and follow it from here. What "newest"
@@ -810,14 +812,6 @@ Panel {
   // ---------------------------------------------------------------------------
 
   function open() {
-    openedFromHotkey = false
-    setCenterHoverRevealSuppressed(false)
-    root.controller.show()
-    root.onOpened()
-  }
-
-  function openFromHotkey() {
-    openedFromHotkey = true
     root.controller.show()
     root.onOpened()
     Qt.callLater(function() {
@@ -840,7 +834,7 @@ Panel {
 
   function toggle() {
     if (root.opened) root.close()
-    else root.openFromHotkey()
+    else root.open()
   }
 
   property bool manifestHeld: false
@@ -893,12 +887,6 @@ Panel {
     Qt.callLater(function() { coverageProbe.probe() })
   }
 
-  function switchPanel(direction) {
-    if (root.bar && typeof root.bar.switchPanelFrom === "function")
-      return root.bar.switchPanelFrom(root.barIdentity, direction)
-    return false
-  }
-
   function setCenterHoverRevealSuppressed(value) {
     if (!root.bar) return
     // PluginBarApi exposes centerHoverRevealSuppressed as readonly. In QML,
@@ -916,9 +904,9 @@ Panel {
   IpcHandler {
     target: root.ipcTarget
 
-    function open() { root.openFromHotkey() }
+    function open() { root.open() }
     function close() { root.close() }
-    function show() { root.openFromHotkey() }
+    function show() { root.open() }
     function hide() { root.close() }
     function toggle() { root.toggle() }
   }
@@ -1020,7 +1008,10 @@ Panel {
       // prompt, where the question owns the whole keyboard.
       blocked: root.editingLocation || root.settingsHasFocus || root.locationPromptOpen
       onCloseRequested: root.close()
-      onTabRequested: function(direction) { root.switchPanel(direction) }
+      onTabRequested: function(direction) {
+        if (root.bar && typeof root.bar.switchPanelFrom === "function")
+          root.bar.switchPanelFrom(root.barIdentity, direction)
+      }
       onReturnRequested: if (root.radarMode) root.playing = !root.playing
 
       Keys.onPressed: function(event) {
@@ -1163,10 +1154,10 @@ Panel {
           LegendStrip {
             width: parent.width
             bar: root.bar
-            mode: root.shownAirLayerName !== "" ? root.activeCategory : "radar"
+            mode: root.airShown ? root.activeCategory : "radar"
             layerLabel: root.activeLayer ? CamsModel.layerLabel(root.activeLayer) : ""
-            lowEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).low : ""
-            highEnd: root.shownAirLayerName !== "" ? CamsModel.legendEnds(root.activeCategory).high : ""
+            lowEnd: root.airLegendEnds ? root.airLegendEnds.low : ""
+            highEnd: root.airLegendEnds ? root.airLegendEnds.high : ""
           }
 
           LayerPicker {
@@ -1178,7 +1169,9 @@ Panel {
             selectedLayerName: root.activeLayer ? root.activeLayer.name : ""
 
             onCategoryChosen: function(id) { root.chooseCategory(id) }
-            onLayerChosen: function(layer) { root.chooseLayer(layer) }
+            onLayerChosen: function(layer) {
+              if (layer) root.setSelectedLayer(root.activeCategory, layer.name)
+            }
             onLayerCleared: root.clearAirOverlay()
           }
 

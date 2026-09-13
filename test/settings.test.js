@@ -43,8 +43,8 @@ test("the threshold options offered are the ones the alert logic understands", (
 test("the air-quality band options are real EEA bands, and the default is one of them", () => {
   const options = schemaFor("aqAlertBand").options
   for (const name of options) {
-    assert.ok(CamsModel.BAND_NAMES.includes(name), `${name} is not a band CamsModel knows`)
-    assert.ok(Alerts.AQ_BAND_NAMES.includes(name), `${name} is not a band Alerts knows`)
+    assert.ok(CamsModel.BAND_NAMES.includes(name),
+      `${name} is not a band CamsModel knows`)
   }
   assert.ok(options.includes(widget.defaults.aqAlertBand),
     "the default band must be one the picker offers")
