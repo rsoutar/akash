@@ -2,7 +2,7 @@ const { test } = require("node:test")
 const assert = require("node:assert")
 const { readFileSync } = require("node:fs")
 const { join } = require("node:path")
-const { loadLibrary, TileMath } = require("./load.js")
+const { loadLibrary, TileMath, RadarModel } = require("./load.js")
 
 const Basemap = loadLibrary("Basemap.js", { TileMath })
 
@@ -414,7 +414,7 @@ test("every hole in the shipped basemap is wound against the ring it sits in", (
 test("the shipped basemap carries every layer the renderer draws", () => {
   // The renderer names these; a rebuild that dropped one would leave the map
   // quietly missing its coastlines.
-  for (const name of ["land-lo", "land", "lakes", "urban", "rivers", "admin1", "admin0", "places"]) {
+  for (const name of ["land-lo", "land", "lakes", "urban", "rivers", "roads", "admin1", "admin0", "places"]) {
     assert.ok(shipped.layers[name], `missing layer: ${name}`)
     assert.ok(shipped.layers[name].featureCount > 0, `empty layer: ${name}`)
   }
@@ -422,7 +422,7 @@ test("the shipped basemap carries every layer the renderer draws", () => {
 
 test("every zoom the map can reach is covered by a ground layer", () => {
   // Without this a zoom level renders as bare sea, which reads as a fault.
-  for (let zoom = 3; zoom <= 9; zoom++) {
+  for (let zoom = 3; zoom <= RadarModel.MAX_MAP_ZOOM; zoom++) {
     const ground = ["land-lo", "land"].filter(
       name => Basemap.layerAppliesAt(shipped.layers[name], zoom))
     assert.strictEqual(ground.length, 1,
@@ -711,14 +711,14 @@ function crossesInterior(x1, y1, x2, y2, where) {
 
 test("the shipped ground draws no shortcut across the poles", () => {
   // The same check against the real data, at the limit the map can reach.
-  for (const zoom of [3, 5, 7, 9]) {
+  for (const zoom of [3, 5, 7, 9, 11]) {
     for (const latitude of [TileMath.constrainLatitude(-89.9, zoom, 320),
                             TileMath.constrainLatitude(89.9, zoom, 320)]) {
       for (const longitude of [-180, -90, 0, 90, 170]) {
         const where = view(zoom, latitude, longitude)
         const window = Basemap.viewBounds(where)
 
-        for (const name of ["land-lo", "land", "lakes", "urban", "rivers"]) {
+        for (const name of ["land-lo", "land", "lakes", "urban", "rivers", "roads"]) {
           const layer = shipped.layers[name]
           if (!Basemap.layerAppliesAt(layer, zoom)) continue
           for (const offset of Basemap.worldOffsets(window)) {

@@ -28,7 +28,7 @@ Canvas {
   // Drawn in this order, back to front. Taken from a list here rather than
   // from the file's own order, so what sits on top of what is a decision in
   // the renderer and not an accident of how the data was generated.
-  readonly property var drawOrder: ["land-lo", "land", "lakes", "urban", "rivers", "admin1", "admin0"]
+  readonly property var drawOrder: ["land-lo", "land", "lakes", "urban", "rivers", "roads", "admin1", "admin0"]
 
   readonly property color surface: Color.popups.background
   readonly property color ink: Color.popups.text
@@ -48,6 +48,7 @@ Canvas {
   readonly property color urbanColor: mix(surface, ink, 0.21)
   readonly property color coastColor: mix(surface, ink, 0.34)
   readonly property color riverColor: mix(surface, ink, 0.26)
+  readonly property color roadColor: mix(surface, ink, 0.30)
   readonly property color admin1Color: mix(surface, ink, 0.22)
   readonly property color admin0Color: mix(surface, ink, 0.42)
   readonly property color labelColor: mix(surface, ink, 0.72)
@@ -94,6 +95,7 @@ Canvas {
     "lakes":   { fill: seaColor,    stroke: coastColor, width: 0.8 },
     "urban":   { fill: urbanColor },
     "rivers":  { stroke: riverColor, width: 0.9 },
+    "roads":   { stroke: roadColor, width: 0.9 },
     "admin1":  { stroke: admin1Color, width: 0.8 },
     "admin0":  { stroke: admin0Color, width: 1.1 }
   }

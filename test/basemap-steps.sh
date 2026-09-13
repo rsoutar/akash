@@ -160,11 +160,11 @@ fi
 
 check "the basemap decodes" "no" "$(value failed)"
 check "every layer the file holds arrives" \
-  "land-lo,land,lakes,urban,rivers,admin1,admin0,places" "$(value layers)"
+  "land-lo,land,lakes,urban,rivers,admin1,admin0,roads,places" "$(value layers)"
 
 # Layers arrive one at a time: the count seen by the ticking timer grows in
 # more than one jump. A decoder that published only at the end would show a
-# single arrival of eight.
+# single arrival of nine.
 arrivals=$(value arrivals)
 check "layers arrive as they complete, not all at once" \
   "yes" "$([[ $arrivals == *,* ]] && echo yes || echo no)"
