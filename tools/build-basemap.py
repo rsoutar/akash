@@ -79,13 +79,23 @@ LINE, POLYGON, POINTS = 0, 1, 2
 LAYERS = [
     # name        source file                                   kind      tol     zooms
     ("land-lo",   "ne_50m_land",                                POLYGON,  0.050,  (3, 5)),
-    ("land",      "ne_10m_land",                                POLYGON,  0.002,  (6, 9)),
-    ("lakes",     "ne_10m_lakes",                               POLYGON,  0.004,  (5, 9)),
-    ("urban",     "ne_10m_urban_areas",                         POLYGON,  0.002,  (7, 9)),
-    ("rivers",    "ne_10m_rivers_lake_centerlines",             LINE,     0.004,  (6, 9)),
-    ("admin1",    "ne_10m_admin_1_states_provinces_lines",      LINE,     0.005,  (5, 9)),
-    ("admin0",    "ne_10m_admin_0_boundary_lines_land",         LINE,     0.002,  (3, 9)),
+    ("land",      "ne_10m_land",                                POLYGON,  0.002,  (6, 11)),
+    ("lakes",     "ne_10m_lakes",                               POLYGON,  0.004,  (5, 11)),
+    ("urban",     "ne_10m_urban_areas",                         POLYGON,  0.002,  (7, 11)),
+    ("rivers",    "ne_10m_rivers_lake_centerlines",             LINE,     0.004,  (6, 11)),
+    ("admin1",    "ne_10m_admin_1_states_provinces_lines",      LINE,     0.005,  (5, 11)),
+    ("admin0",    "ne_10m_admin_0_boundary_lines_land",         LINE,     0.002,  (3, 11)),
+    ("roads",     "ne_10m_roads",                               LINE,     0.003,  (8, 11)),
 ]
+
+# Roads kept, out of Natural Earth's many. A weather map wants the network
+# between towns, and the minor roads and ferry routes would otherwise dominate
+# the file and clutter the ground at the zooms this map reaches.
+ROAD_TYPES = {"Major Highway", "Secondary Highway", "Beltway"}
+
+
+def keep_road(properties):
+    return properties.get("type") in ROAD_TYPES
 
 PLACES_SOURCE = "ne_10m_populated_places_simple"
 
@@ -235,12 +245,14 @@ def encode_rings(rings):
 # Layers
 # ---------------------------------------------------------------------------
 
-def build_geometry_layer(name, source, kind, tolerance, zooms):
+def build_geometry_layer(name, source, kind, tolerance, zooms, keep=None):
     collection = fetch(source)
     features = []
     points_in = points_out = 0
 
     for record in collection["features"]:
+        if keep is not None and not keep(record.get("properties") or {}):
+            continue
         for raw_rings in features_of(record.get("geometry")):
             rings = []
             for ring in raw_rings:
@@ -323,12 +335,13 @@ def main():
     for name, source, kind, tolerance, zooms in LAYERS:
         sys.stderr.write(f"building {name}\n")
         body, count, points_in, points_out = build_geometry_layer(
-            name, source, kind, tolerance, zooms)
+            name, source, kind, tolerance, zooms,
+            keep=keep_road if name == "roads" else None)
         layers.append(body)
         report.append((name, count, points_in, points_out, len(body)))
 
     sys.stderr.write("building places\n")
-    body, count = build_places_layer((3, 9))
+    body, count = build_places_layer((3, 11))
     layers.append(body)
     report.append(("places", count, count, count, len(body)))
 

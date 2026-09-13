@@ -122,7 +122,7 @@
         "type": "integer",
         "label": "Default zoom",
         "min": 3,
-        "max": 9,
+        "max": 11,
         "step": 1,
         "defaultValue": 7,
         "description": "Zoom the map opens at. Past level 7 the ground keeps sharpening while the radar is scaled up, since that is where the radar data runs out."

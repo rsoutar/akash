@@ -95,11 +95,12 @@ when fetching them failed, and "no radar coverage" where RainViewer has none.
 Large parts of the world have no ground radar at all, and there an empty map
 means "nothing is known" rather than "nothing is falling".
 
-Radar tiles stop at zoom level 7, about 1.1 km per pixel; the map goes to 9
+Radar tiles stop at zoom level 7, about 1.1 km per pixel; the map goes to 11
 anyway, so past 7 the ground keeps sharpening while the radar is scaled up
 over it — which shows plainly where the radar's data ran out. The ground
-itself is Natural Earth at 1:10 million, drawn from data in the repository,
-so the map follows your Omarchy theme and works offline.
+itself is Natural Earth at 1:10 million, with its major and secondary highways
+on top, drawn from data in the repository, so the map follows your Omarchy
+theme and works offline.
 
 ## Air quality
 
