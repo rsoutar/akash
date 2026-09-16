@@ -243,7 +243,7 @@ Everything that is a plain function lives in `lib/` and is tested with Node's
 own runner; `cams.py` is tested with the standard library's `unittest`:
 
 ```bash
-node --test
+node --test test/*.test.js
 python3 test/cams.test.py
 ```
 
