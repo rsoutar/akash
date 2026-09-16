@@ -88,6 +88,28 @@ test("a chip change is acted on after the mode bindings settle", () => {
     /onActiveCategoryChanged:\s*Qt\.callLater\(function\(\)\s*\{[\s\S]*?syncAirOverlay\(\)[\s\S]*?syncRadarOverlay\(\)/)
 })
 
+test("tile stalls are handled by the map canvas, not the panel", () => {
+  const panel = read("Panel.qml")
+  const canvas = read(join("ui", "MapCanvas.qml"))
+
+  // TileLayer exposes `stalled`; MapCanvas owns the paired layers and is the
+  // only component that can retry both. Binding an invented onTilesStalled
+  // handler on Panel makes Quickshell reject the panel after a shell restart.
+  assert.doesNotMatch(panel, /onTilesStalled/)
+  assert.match(canvas, /onStalled:\s*root\.retryTiles\(\)/)
+})
+
+test("a keycap emits its own activation signal", () => {
+  const panel = read("Panel.qml")
+
+  // The inline component owns `activated`. Calling it on the enclosing Panel
+  // throws at click time and can interrupt the settings control that was
+  // clicked immediately after opening the map.
+  assert.match(panel, /component KeyCap: BorderSurface \{\s*\n\s*id: keyCap/)
+  assert.match(panel, /onClicked:\s*keyCap\.activated\(\)/)
+  assert.doesNotMatch(panel, /onClicked:\s*root\.activated\(\)/)
+})
+
 test("the legend is a strip docked under the map at the map's width", () => {
   const panel = read("Panel.qml")
   const legend = read(join("ui", "LegendStrip.qml"))

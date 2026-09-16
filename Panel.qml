@@ -346,6 +346,10 @@ Panel {
     var steps = CamsModel.layerSteps(layer)
     if (steps.length === 0) return
     var index = Frames.clampIndex(camsFrames, camsFrameIndex)
+    // The layer and its frame model update in separate binding turns. While
+    // the new list is still empty clampIndex answers -1; assigning
+    // steps[-1] would throw before the later turn can supply the first step.
+    if (index < 0) return
     shownAirStepTime = steps[Math.min(index, steps.length - 1)]
   }
 
@@ -1647,6 +1651,7 @@ Panel {
   // caption letter, clickable. Inline components declared inside the root stay
   // in scope for the panel tree.
   component KeyCap: BorderSurface {
+    id: keyCap
     signal activated()
     property alias label: keyText.text
 
@@ -1671,7 +1676,7 @@ Panel {
       anchors.fill: parent
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
-      onClicked: root.activated()
+      onClicked: keyCap.activated()
     }
   }
 
