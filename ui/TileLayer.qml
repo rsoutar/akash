@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell.Io
 import "../lib/TileMath.js" as TileMath
 
 // One raster layer of an XYZ tile map.
@@ -133,8 +134,16 @@ Item {
       width: root.tileSize * root.sourceScale
       height: root.tileSize * root.sourceScale
 
-      source: root.tileUrlFor ? root.tileUrlFor(root.sourceZoom, modelData.tileX, modelData.tileY) : ""
-      asynchronous: true
+      // Qt's HTTPS image loader can remain in Image.Loading after the shell
+      // restarts. Fetch through the same bounded curl transport as the
+      // manifest, then hand Image a local data URL instead.
+      readonly property string remoteSource: root.tileUrlFor
+        ? root.tileUrlFor(root.sourceZoom, modelData.tileX, modelData.tileY) : ""
+      property string imageData: ""
+      property bool fetchAnswered: false
+
+      source: imageData
+      asynchronous: false
       cache: true
       // The loader is asked for a tile-sized surface rather than whatever the
       // response turns out to declare. Every other stream that reaches this
@@ -162,13 +171,46 @@ Item {
         if (root.pending > 0) root.pending--
       }
 
-      Component.onCompleted: {
-        // An image already decoded from the cache never emits another
-        // statusChanged, so it must never be counted in.
-        if (source !== "" && status !== Image.Ready && status !== Image.Error) {
-          counted = true
-          root.pending++
+      function startFetch() {
+        if (remoteSource === "" || tileFetch.running) return
+        fetchAnswered = false
+        counted = true
+        root.pending++
+        // The manifest validates the HTTPS tile host. The URL travels as an
+        // argv value, never as interpolated shell text.
+        tileFetch.command = ["bash", "-o", "pipefail", "-c",
+          "curl -fsS --max-time 10 --max-filesize 1048576 \"$1\" | base64 --wrap=0",
+          "akash-tile", remoteSource]
+        tileFetch.running = true
+      }
+
+      onRemoteSourceChanged: {
+        imageData = ""
+        if (remoteSource !== "") Qt.callLater(function() { tile.startFetch() })
+      }
+
+      Process {
+        id: tileFetch
+        stdout: StdioCollector { id: tileBytes; waitForEnd: true }
+
+        onExited: function(exitCode) {
+          tile.fetchAnswered = true
+          if (exitCode !== 0 || tile.remoteSource === "") {
+            tile.settle()
+            return
+          }
+          // curl limits the PNG to 1 MiB before base64 expansion; Image then
+          // decodes the data URL into the tile-sized surface below.
+          tile.imageData = "data:image/png;base64," + tileBytes.text.trim()
         }
+
+        onRunningChanged: {
+          if (!running && !tile.fetchAnswered) tile.settle()
+        }
+      }
+
+      Component.onCompleted: {
+        if (remoteSource !== "") Qt.callLater(function() { tile.startFetch() })
       }
 
       onStatusChanged: tile.settle()

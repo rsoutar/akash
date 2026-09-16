@@ -39,6 +39,7 @@ const PROCESSES = [
   { id: "notifyProc", file: "Service.qml", bounded: false, collects: false, builder: null },
   { id: "geocodeProc", file: "Panel.qml", bounded: true, collects: true, builder: "geocodingCommand" },
   { id: "locationSaveProc", file: "Panel.qml", bounded: true, collects: false, builder: null },
+  { id: "tileFetch", file: "ui/TileLayer.qml", bounded: false, collects: true, builder: null },
 ]
 
 // Files read straight into the process, and why each one carries no ceiling
@@ -79,14 +80,15 @@ test("the file reads in the sources are the ones written down here", () => {
     FILE_READS.map(f => `${f.file}:${f.id}`).sort())
 })
 
-test("collection is centralised, and BoundedProcess is the one collector", () => {
-  // Every stdout read in the tree is the one inside BoundedProcess.qml; a
-  // second StdioCollector anywhere is a stream that skipped the inventory.
+test("every stdout collector is explicitly inventoried", () => {
+  // TileLayer collects a bounded, base64-encoded PNG because Qt's HTTPS
+  // loader can stall after a shell restart. Other collectors live in
+  // BoundedProcess, and new ones need an entry in PROCESSES above.
   const found = []
   for (const [file, text] of Object.entries(source)) {
     for (const match of text.matchAll(/StdioCollector/g)) found.push(file)
   }
-  assert.deepStrictEqual(found, ["BoundedProcess.qml"])
+  assert.deepStrictEqual(found.sort(), ["BoundedProcess.qml", "ui/TileLayer.qml"])
 })
 
 test("the processes written down as bounded really are", () => {
@@ -145,11 +147,17 @@ test("the CAMS helper is the one place the network is read without curl", () => 
 })
 
 test("no request is built outside the places that put the ceilings on", () => {
-  // A curl command assembled at a call site is a command that can be written
-  // without the ceilings. The QML never mentions curl: its requests come from
-  // the RadarModel builders, its CAMS calls from cams.py's argv.
-  assert.ok(!/"curl"/.test(everything),
-    "QML builds a curl command of its own")
+  // TileLayer is the sole QML exception: Qt's image TLS transport can stall
+  // after a restart, so it uses a bounded curl pipe and decodes a local data
+  // URL. All other QML requests must still come from their builders.
+  const withoutTiles = Object.entries(source)
+    .filter(([file]) => file !== "ui/TileLayer.qml")
+    .map(([, text]) => text).join("\n")
+  assert.ok(!/"curl"/.test(withoutTiles),
+    "QML builds a curl command outside the bounded tile transport")
+  const tiles = source["ui/TileLayer.qml"]
+  assert.match(tiles, /curl -fsS --max-time 10 --max-filesize 1048576/)
+  assert.match(tiles, /base64 --wrap=0/)
 })
 
 // ------------------------------------------------------------------ answering
