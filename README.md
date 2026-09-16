@@ -64,8 +64,11 @@ left alone.
 - `curl` — Omarchy already installs it
 
 The base map needs nothing at all: it ships with the plugin as
-`data/basemap.bin` and works with no network. The plugin also calls
-`omarchy-weather-location` to store a chosen city and
+`data/basemap.bin` and works with no network. The first time the map opens
+after a shell restart the file is decoded; the decoded form is cached in
+`~/.config/omarchy/akash/basemap.cache` and read back from then on, so only a
+plugin update, or deleting that cache, pays for the decode again. The plugin
+also calls `omarchy-weather-location` to store a chosen city and
 `omarchy-notification-send` to raise an alert — both ship with Omarchy.
 
 ## The map

@@ -43,13 +43,17 @@ const PROCESSES = [
 ]
 
 // Files read straight into the process, and why each one carries no ceiling
-// of its own. locationFile is Omarchy's own state file and basemapFile is a
-// vendored asset. The two CAMS files are this plugin's own directory, written
-// by cams.py out of responses it capped while streaming, and distilled — the
-// caps.json holds one small record per layer, never the document it came from.
+// of its own. locationFile is Omarchy's own state file, basemapFile is a
+// vendored asset, and basemapCacheFile is the decoded form of that asset,
+// written by the plugin itself and read only if it still carries the format
+// the code expects. The two CAMS files are this plugin's own directory,
+// written by cams.py out of responses it capped while streaming, and
+// distilled — the caps.json holds one small record per layer, never the
+// document it came from.
 const FILE_READS = [
   { id: "locationFile", file: "Service.qml" },
   { id: "basemapFile", file: "Service.qml" },
+  { id: "basemapCacheFile", file: "Service.qml" },
   { id: "camsCapsFile", file: "Service.qml" },
   { id: "camsStateFile", file: "Service.qml" },
 ]

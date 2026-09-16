@@ -277,7 +277,45 @@ Item {
   property bool basemapFailed: false
   property var basemapDecoder: null
 
+  // The decoded geometry, kept across shell restarts. The decode costs the
+  // shell most of a second on the first map open of every session, and the
+  // ground only changes when the plugin does, so the arrays are written out
+  // once and read back as views over one buffer. It lives beside caps.json in
+  // the plugin's own directory; the cache is never an authority, and anything
+  // unreadable falls through to decoding data/basemap.bin as before.
+  //
+  // lib/Basemap.js owns the format. CACHE_VERSION there must be bumped in the
+  // same change that rebuilds data/basemap.bin.
+  readonly property string basemapCachePath: camsConfigDir + "/basemap.cache"
+
+  // Set once the cache has been consulted, so a missing one does not send
+  // loadBasemap() round again.
+  property bool basemapStarted: false
+
   function loadBasemap() {
+    if (basemap || basemapStarted) return
+    basemapStarted = true
+    basemapCacheFile.path = basemapCachePath
+  }
+
+  FileView {
+    id: basemapCacheFile
+    path: ""
+    // A missing cache is the common first run, not a fault worth logging.
+    printErrors: false
+    onLoaded: {
+      var cached = Basemap.deserializeCache(basemapCacheFile.data())
+      if (cached !== null) {
+        root.basemap = cached
+        root.basemapFailed = false
+      } else {
+        root.decodeBasemap()
+      }
+    }
+    onLoadFailed: root.decodeBasemap()
+  }
+
+  function decodeBasemap() {
     if (basemap || basemapFile.path !== "") return
     basemapFile.path = pluginFile("data/basemap.bin")
   }
@@ -321,10 +359,24 @@ Item {
         root.basemap = decoder.result
         root.basemapFailed = false
         root.basemapDecoder = null
+        // The cache is written once the ground has been on screen for a
+        // moment, never in the frame that draws it: the encode copies several
+        // megabytes, and this is the thread that draws everything.
+        basemapCacheWriter.restart()
       } else if (decoder.order.length !== layersBefore) {
         root.basemap = decoder.partial()
       }
     }
+  }
+
+  // Writes the decoded ground to the cache, a second after it was drawn. It
+  // runs only after a decode — a cache that read back cleanly is already the
+  // answer — so this costs one encode per plugin version, not one per session.
+  Timer {
+    id: basemapCacheWriter
+    interval: 1000
+    repeat: false
+    onTriggered: basemapCacheFile.setData(Basemap.serializeCache(root.basemap))
   }
 
   // ---------------------------------------------------------------------------

@@ -375,6 +375,90 @@ test("the shipped basemap decodes", () => {
   assert.strictEqual(shipped.quantum, QUANTUM)
 })
 
+// ---------------------------------------------------------------------------
+// The decoded cache
+// ---------------------------------------------------------------------------
+
+test("a decoded map round-trips through the cache unchanged", () => {
+  // The cache is a second representation of the same data, so everything the
+  // renderer reads has to come back identical: the typed arrays, the bounding
+  // boxes, the ring and chunk indices, and the places, accents and all.
+  const map = Basemap.decode(encode(SIMPLE))
+  const round = Basemap.deserializeCache(Basemap.serializeCache(map))
+  assert.notStrictEqual(round, null, "the cache could not be read back")
+  assert.strictEqual(round.quantum, map.quantum)
+  assert.deepStrictEqual(round.order, map.order)
+  for (const name of map.order) {
+    const a = map.layers[name]
+    const b = round.layers[name]
+    assert.strictEqual(b.name, a.name)
+    assert.strictEqual(b.kind, a.kind)
+    assert.strictEqual(b.minZoom, a.minZoom)
+    assert.strictEqual(b.maxZoom, a.maxZoom)
+    assert.strictEqual(b.featureCount, a.featureCount)
+    if (a.kind === 2) {
+      assert.deepStrictEqual(b.places, a.places, `${name}.places`)
+      continue
+    }
+    for (const field of ["coordinates", "ringStart", "featureRing", "bounds", "ringChunk", "chunkBounds"]) {
+      assert.deepStrictEqual(b[field], a[field], `${name}.${field}`)
+    }
+    assert.strictEqual(b.chunkCount, a.chunkCount, `${name}.chunkCount`)
+  }
+})
+
+test("a place name too long for a one-byte length still round-trips", () => {
+  // A name's length is itself a varint, so a long name spends two bytes on it.
+  // Sizing the cache as if it always spent one writes off the end of the
+  // buffer, and a typed array ignores the writes rather than throwing, so the
+  // last places simply go missing.
+  const long = "W".repeat(200)
+  const map = Basemap.decode(encode([{
+    name: "places", kind: 2, minZoom: 0, maxZoom: 9,
+    places: [{ x: 1000, y: -2000, minZoom: 3, name: long }]
+  }]))
+  const round = Basemap.deserializeCache(Basemap.serializeCache(map))
+  assert.notStrictEqual(round, null)
+  assert.strictEqual(round.layers.places.places[0].name, long)
+})
+
+test("the shipped basemap round-trips through the cache", () => {
+  // Serializing the read-back map has to reproduce the cache byte for byte:
+  // any field the reader dropped, reordered, or recomputed differently would
+  // change what the second write holds.
+  const cache = Basemap.serializeCache(shipped)
+  const round = Basemap.deserializeCache(cache)
+  assert.notStrictEqual(round, null)
+  assert.ok(Buffer.from(Basemap.serializeCache(round)).equals(Buffer.from(cache)))
+})
+
+test("a cache from another version, or a truncated one, yields null", () => {
+  // The cache is a cache, never an authority: anything unreadable has to fall
+  // back to decoding the shipped file rather than draw wrong ground.
+  const cache = Basemap.serializeCache(shipped)
+  const full = new Uint8Array(cache)
+
+  assert.strictEqual(Basemap.deserializeCache(null), null)
+  assert.strictEqual(Basemap.deserializeCache(new ArrayBuffer(0)), null)
+
+  const wrongMagic = full.slice()
+  wrongMagic[0] = "X".charCodeAt(0)
+  assert.strictEqual(Basemap.deserializeCache(wrongMagic.buffer), null, "wrong magic")
+
+  const oldCache = full.slice()
+  oldCache[4] = Basemap.CACHE_VERSION + 1
+  assert.strictEqual(Basemap.deserializeCache(oldCache.buffer), null, "a cache from the future")
+
+  const oldBasemap = full.slice()
+  oldBasemap[5] = Basemap.FORMAT_VERSION + 1
+  assert.strictEqual(Basemap.deserializeCache(oldBasemap.buffer), null, "a basemap from the future")
+
+  for (const fraction of [0.2, 0.5, 0.9]) {
+    const cut = full.slice(0, Math.floor(full.length * fraction))
+    assert.strictEqual(Basemap.deserializeCache(cut.buffer), null, `truncated to ${fraction}`)
+  }
+})
+
 test("every hole in the shipped basemap is wound against the ring it sits in", () => {
   // The renderer fills with the nonzero winding rule, which is what QtQuick's
   // Context2D does whatever argument fill() is handed. Under that rule a hole

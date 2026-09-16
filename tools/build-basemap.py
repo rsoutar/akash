@@ -17,6 +17,13 @@ committed. Sources are cached in tools/.cache, which is not.
 
     python3 tools/build-basemap.py
 
+Regenerating this file changes the ground, so bump CACHE_VERSION in
+lib/Basemap.js in the same commit. The shell keeps a decoded copy of the
+basemap between sessions and reads it back in preference to the file; that
+copy carries the basemap's FORMAT_VERSION, which does not move for a change
+that keeps the layout, so without the bump a cache of the old ground shadows
+the new one until it is deleted.
+
 Natural Earth is public domain. Credit is given in the panel anyway.
 
 Format
