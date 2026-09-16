@@ -121,6 +121,16 @@ view and the followed time all survive a close. Reopening then starts
 is a question about now; while open, scrubbing and panning are never
 disturbed by an arriving frame list.
 
+The ground is decoded once per session and then kept decoded: after the first
+decode the arrays are written to `~/.config/omarchy/akash/basemap.cache`, and
+the next session reads them back as views over one buffer instead of spending
+the better part of a second on the varint pass. The cache is never an
+authority. It carries its own version and the basemap's, and a missing,
+truncated, or older file is discarded and `data/basemap.bin` decoded as
+before, so a bad cache costs a decode rather than a map. `lib/Basemap.js` owns
+the format, and `CACHE_VERSION` there is bumped in the same change that
+rebuilds `data/basemap.bin`.
+
 ## Split
 
 All network, polling, and alert state lives in `Service.qml`, mounted once per
