@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# The plugin is read-only here: nothing in the suite writes to the repository,
+# and no step needs a token beyond the checkout.
+permissions:
+  contents: read
+
+# A push to a branch with an open pull request would otherwise start two runs
+# of the same commit. Keep the newest.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to a commit: a moving tag is a supply-chain dependency that
+      # changes underneath the tree. The plugin's own review guide asks for the
+      # full SHA.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+      - name: Node tests
+        run: node --test test/
+      - name: Python helper tests
+        run: python3 test/cams.test.py
+
+  shell:
+    name: QML tests (Quickshell)
+    runs-on: ubuntu-latest
+    # Quickshell is packaged in Arch's extra repository, and the legend test
+    # needs the Omarchy shell's own qs.Commons/qs.Ui modules, which only the
+    # Omarchy packages carry. Ubuntu has neither.
+    container:
+      image: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install Quickshell and QML tooling
+        run: |
+          # The Arch images ship a populated keyring; initialise it only if
+          # this one does not, since key generation is slow and needs entropy.
+          if [[ ! -f /etc/pacman.d/gnupg/pubring.gpg ]]; then
+            pacman-key --init
+            pacman-key --populate archlinux
+          fi
+          pacman -Syu --noconfirm --needed quickshell qt6-declarative libarchive
+      # The Omarchy shell modules come from the 121 MiB omarchy package, most
+      # of which is a desktop this job never starts, so the package is unpacked
+      # for its shell directory rather than installed. The filename is read
+      # from the repository's own database, so it tracks the current release
+      # without anyone editing this file.
+      - name: Resolve the Omarchy release
+        id: omarchy
+        run: |
+          curl -fsSL -o /tmp/omarchy.db https://pkgs.omarchy.org/rc/x86_64/omarchy.db
+          entry=$(bsdtar -tf /tmp/omarchy.db | grep -m1 '^omarchy-[0-9].*/desc$')
+          file=$(bsdtar -xOf /tmp/omarchy.db "$entry" \
+            | awk '/^%FILENAME%$/{getline; print; exit}')
+          [[ -n $file ]]
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+      # The shell directory is 2 MiB; the package holding it is 121 MiB.
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: /usr/share/omarchy/shell
+          key: omarchy-shell-${{ steps.omarchy.outputs.file }}
+      - name: Install the Omarchy shell modules
+        env:
+          OMARCHY_PKG: ${{ steps.omarchy.outputs.file }}
+        run: |
+          if [[ -d /usr/share/omarchy/shell/Commons ]]; then
+            echo "restored from cache"
+            exit 0
+          fi
+          curl -fsSL -o /tmp/omarchy.pkg.tar.zst \
+            "https://pkgs.omarchy.org/rc/x86_64/${OMARCHY_PKG}"
+          bsdtar -xf /tmp/omarchy.pkg.tar.zst -C / usr/share/omarchy/shell
+          test -d /usr/share/omarchy/shell/Commons
+      - name: QML tests
+        env:
+          AKASH_REQUIRE_QS: "1"
+        run: |
+          # An Omarchy desktop sets QT_QPA_PLATFORMTHEME=gtk3, which makes qs
+          # initialise GTK and abort with no display even under the offscreen
+          # platform the scripts select. CI has no desktop, but a contributor
+          # running this job's steps locally does, and so does a self-hosted
+          # runner.
+          unset QT_QPA_PLATFORMTHEME
+          ./test/first-run.sh
+          ./test/basemap-steps.sh
+          ./test/legend.qml-test.sh
+      - name: Lint the QML
+        run: /usr/lib/qt6/bin/qmllint -I /usr/share/omarchy/shell -I . *.qml ui/*.qml

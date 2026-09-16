@@ -284,8 +284,9 @@ Item {
   // the plugin's own directory; the cache is never an authority, and anything
   // unreadable falls through to decoding data/basemap.bin as before.
   //
-  // lib/Basemap.js owns the format. CACHE_VERSION there must be bumped in the
-  // same change that rebuilds data/basemap.bin.
+  // lib/Basemap.js owns the format, and stamps every cache with the digest of
+  // data/basemap.bin from lib/BasemapDigest.js: rebuilding the ground changes
+  // the digest, so a stale cache is refused with nothing to bump by hand.
   readonly property string basemapCachePath: camsConfigDir + "/basemap.cache"
 
   // Set once the cache has been consulted, so a missing one does not send
@@ -303,6 +304,10 @@ Item {
     path: ""
     // A missing cache is the common first run, not a fault worth logging.
     printErrors: false
+    // QSaveFile: a temp file in the same directory, renamed over the target,
+    // so a symlink planted at the cache's name is replaced rather than
+    // followed. The cache is not private, so the 0644 it lands with is fine.
+    atomicWrites: true
     onLoaded: {
       var cached = Basemap.deserializeCache(basemapCacheFile.data())
       if (cached !== null) {

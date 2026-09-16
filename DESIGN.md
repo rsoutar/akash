@@ -125,11 +125,13 @@ The ground is decoded once per session and then kept decoded: after the first
 decode the arrays are written to `~/.config/omarchy/akash/basemap.cache`, and
 the next session reads them back as views over one buffer instead of spending
 the better part of a second on the varint pass. The cache is never an
-authority. It carries its own version and the basemap's, and a missing,
-truncated, or older file is discarded and `data/basemap.bin` decoded as
-before, so a bad cache costs a decode rather than a map. `lib/Basemap.js` owns
-the format, and `CACHE_VERSION` there is bumped in the same change that
-rebuilds `data/basemap.bin`.
+authority. It carries its own layout version and the digest of the ground it
+was decoded from, and a missing, truncated, or differently stamped file is
+discarded and `data/basemap.bin` decoded as before, so a bad cache costs a
+decode rather than a map. `lib/Basemap.js` owns the format; the digest lives in
+`lib/BasemapDigest.js`, which `tools/build-basemap.py` regenerates, so a
+rebuilt ground invalidates every cached decode by construction — there is no
+version to remember to bump in the same commit.
 
 ## Split
 
