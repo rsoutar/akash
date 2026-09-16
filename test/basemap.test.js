@@ -1,10 +1,12 @@
 const { test } = require("node:test")
 const assert = require("node:assert")
+const { createHash } = require("node:crypto")
 const { readFileSync } = require("node:fs")
 const { join } = require("node:path")
 const { loadLibrary, TileMath, RadarModel } = require("./load.js")
 
-const Basemap = loadLibrary("Basemap.js", { TileMath })
+const BasemapDigest = loadLibrary("BasemapDigest.js")
+const Basemap = loadLibrary("Basemap.js", { TileMath, BasemapDigest })
 
 const QUANTUM = 1000
 
@@ -422,6 +424,18 @@ test("a place name too long for a one-byte length still round-trips", () => {
   assert.strictEqual(round.layers.places.places[0].name, long)
 })
 
+test("the shipped basemap carries the digest the cache is keyed on", () => {
+  // tools/build-basemap.py writes the digest of data/basemap.bin into
+  // lib/BasemapDigest.js, and the shell stamps it into every decoded cache. A
+  // rebuild whose regenerated digest was not committed would leave every
+  // installed cache accepted as current — a map of the ground the file used to
+  // hold. Pinning the pair here is what fails instead.
+  const file = readFileSync(join(__dirname, "..", "data", "basemap.bin"))
+  const digest = createHash("sha256").update(file).digest("hex")
+  assert.strictEqual(digest, BasemapDigest.BASEMAP_SHA256,
+    "data/basemap.bin changed without regenerating lib/BasemapDigest.js")
+})
+
 test("the shipped basemap round-trips through the cache", () => {
   // Serializing the read-back map has to reproduce the cache byte for byte:
   // any field the reader dropped, reordered, or recomputed differently would
@@ -450,8 +464,9 @@ test("a cache from another version, or a truncated one, yields null", () => {
   assert.strictEqual(Basemap.deserializeCache(oldCache.buffer), null, "a cache from the future")
 
   const oldBasemap = full.slice()
-  oldBasemap[5] = Basemap.FORMAT_VERSION + 1
-  assert.strictEqual(Basemap.deserializeCache(oldBasemap.buffer), null, "a basemap from the future")
+  oldBasemap[6] = oldBasemap[6] === 0x61 ? 0x62 : 0x61
+  assert.strictEqual(Basemap.deserializeCache(oldBasemap.buffer), null,
+    "a cache stamped with another basemap")
 
   for (const fraction of [0.2, 0.5, 0.9]) {
     const cut = full.slice(0, Math.floor(full.length * fraction))

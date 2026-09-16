@@ -243,7 +243,7 @@ Everything that is a plain function lives in `lib/` and is tested with Node's
 own runner; `cams.py` is tested with the standard library's `unittest`:
 
 ```bash
-node --test
+node --test test/*.test.js
 python3 test/cams.test.py
 ```
 
@@ -265,6 +265,21 @@ failure:
 ./test/basemap-steps.sh   # decoding the ground never stalls the shell
 ./test/legend.qml-test.sh # the map legend compiles and renders its two ramps
 ```
+
+They run `qs` with `QT_QPA_PLATFORM=offscreen`, so they need no desktop — but
+on a machine already running Omarchy, where the shell exports
+`QT_QPA_PLATFORMTHEME=gtk3`, `qs` initialises GTK and aborts with no display
+anyway. Take the theme engine out of the environment:
+
+```bash
+env -u QT_QPA_PLATFORMTHEME ./test/basemap-steps.sh
+```
+
+CI runs the Node and Python suites on `ubuntu-latest` and the QML suites in an
+Arch container, where `quickshell` is packaged and the Omarchy shell modules
+that `legend.qml-test.sh` imports can be unpacked; see
+`.github/workflows/ci.yml`. Nothing reaches the network: the shell tests
+replace `curl` and `omarchy-weather-location` on `PATH`.
 
 QML is also checked statically, which needs the shell's modules on the import
 path:
