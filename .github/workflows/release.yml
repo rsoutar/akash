@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+# Creating the GitHub Release needs write. Nothing else in this job
+# touches the repository contents beyond the checkout used to read
+# manifest.json.
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      # Same pin as ci.yml — a moving tag is a supply-chain dependency.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Verify tag matches manifest.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])")
+          if [[ "$tag" != "$version" ]]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match manifest.json version ${version}"
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} matches manifest.json ${version}"
+
+      # gh is on the runner image; no third-party release action to pin.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
