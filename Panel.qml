@@ -786,8 +786,12 @@ Panel {
   function tileUrlForFrame(index, z, x, y) {
     if (!root.service || !root.service.tileHost) return ""
     if (index < 0 || index >= root.frames.length) return ""
-    return RadarModel.tileUrl(root.service.tileHost, root.frames[index].path, 256,
+    var url = RadarModel.tileUrl(root.service.tileHost, root.frames[index].path, 256,
       z, x, y, root.colorSchemeId, root.smoothTiles, root.showSnow)
+    // A retry needs a fresh cache key: Qt's loader caches by URL and will
+    // hand back the still-stuck request forever otherwise.
+    if (map.tileRetry > 0) return url + "?r=" + map.tileRetry
+    return url
   }
 
   Timer {
@@ -855,6 +859,9 @@ Panel {
     if (hasLocation) recenter()
     showLatestFrame()
     applyDefaultView()
+    // A fresh open starts from clean tile URLs. A retry suffix from an
+    // earlier stall would key straight into the still-stuck cache entry.
+    map.tileRetry = 0
 
     // A brand-new install with no location anywhere is asked for its city
     // before anything else. Asked once, and only when there is genuinely

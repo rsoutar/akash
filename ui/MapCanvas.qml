@@ -59,6 +59,19 @@ Item {
   // revision so that a new manifest reloads the tiles even when the index did
   // not move.
   property int frameEpoch: 0
+  // Bumped to retry a tile layer that stalled. Folded into the revision AND
+  // into the URL the panel builds, so a retry is a fresh request rather than
+  // another look at the stuck cache entry. Owned here — the layers share it,
+  // and whoever is asking for a refresh (the panel on open) can reset it.
+  property int tileRetry: 0
+  readonly property int maxTileRetries: 2
+
+  function retryTiles() {
+    // Capped so a dead network retries a bounded number of times and then
+    // shows the honest empty map. The layer has already settled itself.
+    if (root.tileRetry < root.maxTileRetries) root.tileRetry++
+  }
+
   property int colorSchemeId: 2
   property bool smoothTiles: true
 
@@ -133,8 +146,10 @@ Item {
       sourceZoom: root.overlaySourceZoom
       tileUrlFor: root.tileUrlA
       revision: root.frameA + (root.colorSchemeId * 1000) + (root.frameEpoch * 100000)
+        + (root.tileRetry * 1000000)
       smooth: root.smoothTiles
       opacity: root.frontIsA ? 1 : 0
+      onStalled: root.retryTiles()
       Behavior on opacity {
         NumberAnimation { duration: 380; easing.type: Easing.InOutQuad }
       }
@@ -151,8 +166,10 @@ Item {
       sourceZoom: root.overlaySourceZoom
       tileUrlFor: root.tileUrlB
       revision: root.frameB + (root.colorSchemeId * 1000) + (root.frameEpoch * 100000)
+        + (root.tileRetry * 1000000)
       smooth: root.smoothTiles
       opacity: root.frontIsA ? 0 : 1
+      onStalled: root.retryTiles()
       Behavior on opacity {
         NumberAnimation { duration: 380; easing.type: Easing.InOutQuad }
       }
