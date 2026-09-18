@@ -15,15 +15,16 @@ import "../lib/CamsModel.js" as CamsModel
 //
 // Colours here are data, not chrome: the radar bar is painted from the palette
 // the tile actually renders (`RadarModel.radarLegendFamilies`), and the air bar
-// from the EEA bands (`CamsModel.BAND_COLORS`), so the legend stays faithful to
-// the picture the way DESIGN.md's Picture section demands. The radar ramp is a
-// key rather than a histogram: its three colour families — grey tans, blues,
-// yellow-through-red — share the strip equally, because laying it out by the
-// tile's alpha scale would give the near-identical tans three quarters of the
-// bar. Every label is drawn in the theme's ink so the strip reads on a light
-// Omarchy theme and a dark one. The ends — "Cleaner → More polluted", "Less
-// pollen → More pollen", "Trace" to "Severe" — are passed in by the panel,
-// which owns which category the map is showing.
+// from the CAMS scale the overlay is drawn with (`CamsModel.camsLegendRows`),
+// so the legend stays faithful to the picture the way DESIGN.md's Picture
+// section demands. The radar ramp is a key rather than a histogram: its three
+// colour families — grey tans, blues, yellow-through-red — share the strip
+// equally, because laying it out by the tile's alpha scale would give the
+// near-identical tans three quarters of the bar. The air bar IS laid out by
+// value — CAMS paints equal-width bands, so the legend does too, with the
+// concentration each band tops at printed at its right edge. Every label is
+// drawn in the theme's ink so the strip reads on a light Omarchy theme and a
+// dark one.
 Item {
   id: root
 
@@ -32,17 +33,24 @@ Item {
   property string mode: "radar"
 
   // Exposed so the legend names what it shows: the CAMS layer the air overlay
-  // is drawn from and the two words for what the ends of the scale mean. The
+  // is drawn from, and the two words for what the ends of the scale mean. The
   // radar ramp is one palette whichever scheme is requested, so it takes no
   // scheme name.
   property string layerLabel: ""
   property string lowEnd: ""
   property string highEnd: ""
 
+  // The species tag of the CAMS layer showing, so the air bar paints the same
+  // band table the map does. Empty in radar mode.
+  property string layerSpecies: ""
+
   // The widget, when the map can provide one, for the theme's foreground ink.
   property var bar: null
 
-  readonly property var airRows: CamsModel.airQualityLegend()
+  // The CAMS band table for the layer showing; empty for radar and for species
+  // without a read scale.
+  readonly property var airRows: mode === "radar" ? [] : CamsModel.camsLegendRows(layerSpecies)
+  readonly property string airUnit: mode === "radar" ? "" : CamsModel.camsScaleUnit(layerSpecies)
 
   readonly property string title: {
     if (mode === "radar") return "Radar"
@@ -52,7 +60,7 @@ Item {
 
   // One named rung of whichever ramp is showing. Radar names are the three
   // colour families, each centred on the equal third it paints; air names are
-  // the three levels the six EEA bands pair into, centred on their thirds too.
+  // the CAMS concentration ticks, each sitting at the value it bounds.
   readonly property var tiers: {
     if (mode === "radar") {
       var families = RadarModel.radarLegendFamilies()
@@ -62,18 +70,17 @@ Item {
       }
       return tiers
     }
-    var airTiers = CamsModel.legendTiers()
     var out = []
-    for (var k = 0; k < airTiers.length; k++) {
-      out.push({ name: airTiers[k].name, fraction: (k + 0.5) / airTiers.length })
+    var rows = root.airRows
+    for (var k = 0; k < rows.length; k++) {
+      out.push({ name: String(rows[k].upTo), fraction: (k + 1) / rows.length })
     }
     return out
   }
 
   readonly property string endTitle: {
-    if (lowEnd === "" && highEnd === "") return ""
-    if (lowEnd === "" || highEnd === "") return lowEnd + highEnd
-    return lowEnd + " → " + highEnd
+    if (mode === "radar") return ""
+    return airUnit !== "" ? airUnit : (lowEnd + " → " + highEnd)
   }
 
   readonly property int pad: Style.space(10)
@@ -129,6 +136,7 @@ Item {
     Connections {
       target: root
       function onModeChanged() { ramp.requestPaint() }
+      function onAirRowsChanged() { ramp.requestPaint() }
     }
 
     onPaint: {
@@ -165,19 +173,23 @@ Item {
         ctx.fillStyle = grad
         ctx.fillRect(0, 0, width, height)
       } else {
+        // The CAMS bands, drawn as hard steps: each colour fills exactly the
+        // fraction of the bar its range covers, matching the map's render.
         var rows = root.airRows
         if (rows.length === 0) return
-        var grad = ctx.createLinearGradient(0, 0, width, 0)
         for (var j = 0; j < rows.length; j++) {
-          grad.addColorStop(j / Math.max(1, rows.length - 1), rows[j].color)
+          var x0 = width * j / rows.length
+          var x1 = width * (j + 1) / rows.length
+          ctx.fillStyle = rows[j].color
+          ctx.fillRect(x0, 0, x1 - x0, height)
         }
-        ctx.fillStyle = grad
-        ctx.fillRect(0, 0, width, height)
       }
     }
   }
 
   // The band names, each centred on the length of bar that it names, at the bottom.
+  // Air ticks sit at the boundary they bound, so anchor at the fraction rather
+  // than mid-band; last tick hangs at the bar's right end.
   Repeater {
     model: root.tiers
 
@@ -189,7 +201,11 @@ Item {
       font.family: Style.font.family
       font.pixelSize: Style.font.caption * 0.92
       anchors.horizontalCenter: parent.left
-      anchors.horizontalCenterOffset: root.pad + modelData.fraction * root.stripSpan
+      anchors.horizontalCenterOffset: {
+        if (root.mode === "radar") return root.pad + modelData.fraction * root.stripSpan
+        var x = root.pad + modelData.fraction * root.stripSpan
+        return Math.max(6, Math.min(root.width - 6 - width, x - width / 2))
+      }
       anchors.bottom: parent.bottom
       anchors.bottomMargin: Style.space(6)
     }

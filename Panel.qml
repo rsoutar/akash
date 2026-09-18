@@ -1167,6 +1167,7 @@ Panel {
             bar: root.bar
             mode: root.airShown ? root.activeCategory : "radar"
             layerLabel: root.activeLayer ? CamsModel.layerLabel(root.activeLayer) : ""
+            layerSpecies: root.activeLayer ? (root.activeLayer.species || "") : ""
             lowEnd: root.airLegendEnds ? root.airLegendEnds.low : ""
             highEnd: root.airLegendEnds ? root.airLegendEnds.high : ""
           }

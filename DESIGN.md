@@ -15,10 +15,13 @@ follows the Omarchy theme.
 
 Radar colours come from one place: the `COLOR_SCHEMES` table in
 `lib/RadarModel.js`, selected by the widget's `colorScheme` setting and applied
-to every radar tile request. Air-quality colours come from the EEA band tables
-— `BAND_NAMES`/`BAND_COLORS` in `lib/CamsModel.js`, `AQ_BAND_NAMES` in
-`lib/Alerts.js` — which the map, the bar pill and the notification all derive
-from. The bar pill does not paint with the EEA pastels, which wash out on
+to every radar tile request. The air legend cannot derive its colours from a
+table of its own: the CAMS overlay is rendered by ECMWF, so the legend paints
+the scale the map is actually drawn with, read from each layer's `GetLegend`
+image into `CAMS_SCALES` in `lib/CamsModel.js`. The bar pill and the air-quality
+alert still grade by the EEA bands — `BAND_NAMES`/`BAND_COLORS` in the same
+file — so "Poor" means the same thing in the pill, the notification and the
+settings. The bar pill does not paint with the EEA pastels, which wash out on
 light themes: it signals severity with the theme's `Color.accent` and
 `Color.urgent`, and its tooltip names the band exactly. A colour change to
 either table is shown with a capture, not described.

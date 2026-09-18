@@ -79,10 +79,15 @@ ShellRoot {
       harness.report("radar-title", ls.title + " | " + ls.endTitle)
       ls.mode = "air-quality"
       ls.layerLabel = "PM2.5"
-      ls.lowEnd = "Cleaner"
-      ls.highEnd = "More polluted"
+      ls.layerSpecies = "pm2p5"
       harness.report("air-tiers", ls.tiers.map(function(t) { return t.name }).join(","))
       harness.report("air-title", ls.title + " | " + ls.endTitle)
+      ls.layerSpecies = "aod550"
+      harness.report("aod-tiers", ls.tiers.map(function(t) { return t.name }).join(","))
+      harness.report("aod-unit", ls.airUnit)
+      ls.layerSpecies = "unknown-species"
+      harness.report("unknown-tiers", ls.tiers.map(function(t) { return t.name }).join(","))
+      harness.report("unknown-unit", ls.airUnit)
       Qt.quit()
     }
   }
@@ -114,8 +119,13 @@ fi
 check "MapCanvas.qml still loads without the legend inside it"      "yes" "$(value map-loaded)"
 check "the radar legend names the colour families"      "Light,Moderate,Heavy" "$(value radar-tiers)"
 check "the radar legend names the palette"           "Radar | " "$(value radar-title)"
-check "the air legend names the three levels"          "Good,Moderate,Poor" "$(value air-tiers)"
-check "the air legend names layer and ends"           "Air quality · PM2.5 | Cleaner → More polluted" "$(value air-title)"
+check "the air legend prints the CAMS concentration ticks" \
+  "2,5,10,20,30,40,50,75,100,150,200,500" "$(value air-tiers)"
+check "the air legend reads the CAMS unit"           "Air quality · PM2.5 | µg/m³" "$(value air-title)"
+check "the AOD legend prints the AOD breaks"         "0.15,0.2,0.35,0.5,0.8,1,3" "$(value aod-tiers)"
+check "the AOD legend reads in AOD"                  "AOD" "$(value aod-unit)"
+check "a species with no scale shows no invented bar" "" "$(value unknown-tiers)"
+check "a species with no scale names no unit"        "" "$(value unknown-unit)"
 
 echo
 if (( failures > 0 )); then
