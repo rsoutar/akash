@@ -187,19 +187,39 @@ test("the level carries the name and colour the pill renders", () => {
 
 // ------------------------------------------------------------------ legend
 
-test("the air legend is the EEA bands, low to high", () => {
-  const rows = CamsModel.airQualityLegend()
-  assert.deepStrictEqual(rows.map(r => r.name), CamsModel.BAND_NAMES)
-  assert.deepStrictEqual(rows.map(r => r.color), CamsModel.BAND_COLORS)
-  assert.deepStrictEqual(rows.map(r => r.index), [0, 1, 2, 3, 4, 5])
+// The CAMS render scales the map paints with, read off the served GetLegend
+// images. Pinning the breaks here makes a CAMS restyle fail this suite rather
+// than let the legend drift from the pixels.
+const CAMS_LEGEND = {
+  "pm2p5": { unit: "µg/m³", upTo: [2, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 500] },
+  "pm10": { unit: "µg/m³", upTo: [2, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 500] },
+  "o3": { unit: "µg/m³", upTo: [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 240, 500] },
+  "no2": { unit: "µg/m³", upTo: [0, 2, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 300] },
+  "so2": { unit: "µg/m³", upTo: [0, 2, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 800] },
+  "co": { unit: "µg/m³", upTo: [0, 50, 100, 150, 200, 250, 300, 350, 400, 500, 700, 1000, 2000] },
+  "aod550": { unit: "AOD", upTo: [0.15, 0.2, 0.35, 0.5, 0.8, 1, 3] }
+}
+
+test("the legend rows are the CAMS render scale, low to high", () => {
+  for (const [species, expected] of Object.entries(CAMS_LEGEND)) {
+    const rows = CamsModel.camsLegendRows(species)
+    assert.deepStrictEqual(rows.map(r => r.upTo), expected.upTo)
+    assert.strictEqual(CamsModel.camsScaleUnit(species), expected.unit)
+  }
 })
 
-test("the air legend names its text as three paired levels", () => {
-  // The bar keeps six EEA colours; the words pair them into thirds so each
-  // label sits in the middle of its third, the way the radar legend's do.
-  const tiers = CamsModel.legendTiers()
-  assert.deepStrictEqual(tiers.map(t => t.name), ["Good", "Moderate", "Poor"])
-  assert.strictEqual(tiers.length, 3)
+test("every band carries a colour and its species' unit", () => {
+  for (const species of Object.keys(CAMS_LEGEND)) {
+    for (const row of CamsModel.camsLegendRows(species)) {
+      assert.match(row.color, /^#[0-9A-F]{6}$/)
+      assert.strictEqual(row.unit, CamsModel.camsScaleUnit(species))
+    }
+  }
+})
+
+test("a species with no read scale shows no bar and no unit", () => {
+  assert.deepStrictEqual(CamsModel.camsLegendRows("birch"), [])
+  assert.strictEqual(CamsModel.camsScaleUnit("birch"), "")
 })
 
 test("each category names the ends of its own ramp", () => {
@@ -213,12 +233,8 @@ test("each category names the ends of its own ramp", () => {
   assert.strictEqual(CamsModel.legendEnds("uv").high, "Extreme UV")
 })
 
-test("an unnamed category still names its bands", () => {
+test("an unnamed category still names its ends", () => {
   // The advanced tail has no declared ends; the scale must not lose its names.
   const ends = CamsModel.legendEnds("advanced")
   assert.ok(ends.low !== "" && ends.high !== "")
-  const rows = CamsModel.airQualityLegend()
-  assert.deepStrictEqual(rows.map(r => r.name), CamsModel.BAND_NAMES)
-  assert.deepStrictEqual(CamsModel.legendTiers().map(t => t.name),
-    ["Good", "Moderate", "Poor"])
 })
